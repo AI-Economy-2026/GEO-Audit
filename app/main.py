@@ -14,6 +14,8 @@ from contextlib import asynccontextmanager
 from fastapi import BackgroundTasks, FastAPI, Header, HTTPException
 from pydantic import BaseModel
 
+import os
+
 from app.config import WORKER_API_KEY
 from app.worker import run_audit_task
 
@@ -68,9 +70,10 @@ async def start_audit(
     The caller must provide a valid Bearer token matching WORKER_API_KEY.
     The audit_id must already exist in the geo_audits table.
     """
-    # Verify shared secret
-    expected = f"Bearer {WORKER_API_KEY}"
-    if not WORKER_API_KEY or authorization != expected:
+    # Verify shared secret (read at request time to pick up Railway env vars)
+    api_key = os.environ.get("WORKER_API_KEY", "") or WORKER_API_KEY
+    expected = f"Bearer {api_key}"
+    if not api_key or authorization != expected:
         raise HTTPException(status_code=401, detail="Invalid worker API key.")
 
     logger.info(f"Received audit start request: {req.audit_id}")
