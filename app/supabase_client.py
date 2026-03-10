@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from supabase import create_client, Client
+import os
 
-from app.config import SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+from supabase import create_client, Client
 
 _client: Client | None = None
 
@@ -13,9 +13,11 @@ def get_supabase() -> Client:
     """Return a cached Supabase admin client."""
     global _client
     if _client is None:
-        if not SUPABASE_URL or not SUPABASE_SERVICE_ROLE_KEY:
+        url = os.environ.get("SUPABASE_URL", "")
+        key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
+        if not url or not key:
             raise RuntimeError(
                 "SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set."
             )
-        _client = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+        _client = create_client(url, key)
     return _client
