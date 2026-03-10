@@ -156,12 +156,12 @@ def run_audit_task(audit_id: str) -> None:
             template_path=TEMPLATE_PATH,
         )
 
-        # 5. Upload to Supabase Storage
+        # 5. Upload to Supabase Storage (upsert to handle re-runs)
         filename = f"{audit_id}/dashboard.html"
         sb.storage.from_("geo-dashboards").upload(
             filename,
             dashboard_html.encode("utf-8"),
-            file_options={"content-type": "text/html"},
+            file_options={"content-type": "text/html", "upsert": "true"},
         )
         dashboard_url = sb.storage.from_("geo-dashboards").get_public_url(filename)
 
