@@ -3,16 +3,15 @@ Background audit worker.
 
 Receives an audit_id, loads params from Supabase, runs the audit engine,
 writes results and progress back to Supabase, generates the dashboard HTML,
-and uploads it to Supabase Storage.
+uploads it to Supabase Storage, then runs analysis modules (keyword gaps,
+directory checks, SERP analysis, Alice brief).
 """
 
 from __future__ import annotations
 
+import asyncio
 import logging
-import os
 import time
-import traceback
-from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -22,9 +21,13 @@ from engine.geo_audit_engine import (
     ENGINE_DISPLAY_NAMES,
     Prompt,
     generate_summary_dict,
-    run_audit,
+    run_audit_async,
 )
 from engine.generate_dashboard import render_dashboard_from_data
+from engine.keyword_gap_analysis import analyse_keyword_gaps
+from engine.directory_check import check_directories
+from engine.serp_analysis import check_site_index, check_organic_rankings, compare_ai_vs_seo
+from engine.alice_brief_generator import generate_alice_brief
 
 logger = logging.getLogger(__name__)
 
@@ -38,10 +41,11 @@ def run_audit_task(audit_id: str) -> None:
 
     1. Load audit params + prompts from Supabase
     2. Mark as running
-    3. Query each engine for each prompt (with progress updates)
-    4. Generate dashboard HTML
-    5. Upload to Supabase Storage
-    6. Mark as completed with summary stats
+    3. Query each engine for each prompt (parallel, with progress updates)
+    4. Run analysis modules (keyword gaps, directory check, SERP, Alice brief)
+    5. Generate dashboard HTML
+    6. Upload to Supabase Storage
+    7. Mark as completed with summary stats
     """
     sb = get_supabase()
     start_time = time.time()
@@ -96,7 +100,7 @@ def run_audit_task(audit_id: str) -> None:
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }).eq("id", audit_id).execute()
 
-        # 3. Run audit with progress callback
+        # 3. Run audit with progress callback (parallel via asyncio)
         all_result_rows: list[dict] = []
 
         def on_progress(completed: int, total_count: int, result: AuditResult) -> None:
@@ -139,16 +143,93 @@ def run_audit_task(audit_id: str) -> None:
                 "updated_at": datetime.now(timezone.utc).isoformat(),
             }).eq("id", audit_id).execute()
 
-        results = run_audit(
+        # Run async audit (engine-level parallelism)
+        results = asyncio.run(run_audit_async(
             prompts=prompts,
             brand=params["brand_name"],
             url=params["brand_url"],
             competitors=params["competitors"],
             engines=engines,
             progress_callback=on_progress,
-        )
+        ))
 
-        # 4. Generate dashboard HTML
+        # Update progress for analysis phase
+        sb.table("geo_audits").update({
+            "progress_message": "Running analysis modules...",
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }).eq("id", audit_id).execute()
+
+        # 4. Run analysis modules
+        # 4a. Generate base summary
+        summary = generate_summary_dict(results, params["brand_name"])
+
+        # 4b. Keyword gap analysis
+        logger.info(f"Audit {audit_id}: Running keyword gap analysis...")
+        keyword_gaps = analyse_keyword_gaps(
+            results=all_result_rows,
+            brand=params["brand_name"],
+            competitors=params["competitors"],
+        )
+        summary["keyword_gap_analysis"] = keyword_gaps
+
+        # 4c. Directory check
+        logger.info(f"Audit {audit_id}: Running directory checks...")
+        sb.table("geo_audits").update({
+            "progress_message": "Checking business directories...",
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }).eq("id", audit_id).execute()
+        directory_results = check_directories(params["brand_name"])
+        summary["directory_citations"] = directory_results
+
+        # 4d. SERP analysis
+        logger.info(f"Audit {audit_id}: Running SERP analysis...")
+        sb.table("geo_audits").update({
+            "progress_message": "Analysing organic search rankings...",
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }).eq("id", audit_id).execute()
+
+        site_index = check_site_index(params["brand_url"])
+
+        prompt_dicts = [{"prompt_id": p.prompt_id, "prompt_text": p.prompt_text} for p in prompts]
+        organic_rankings = check_organic_rankings(prompt_dicts, params["brand_url"])
+
+        serp_comparison = compare_ai_vs_seo(all_result_rows, organic_rankings)
+        summary["serp_analysis"] = {
+            "site_indexed": site_index,
+            "organic_rankings": organic_rankings,
+            "comparisons": serp_comparison["comparisons"],
+            "summary": serp_comparison["summary"],
+        }
+
+        # 4e. Alice brief
+        logger.info(f"Audit {audit_id}: Generating content recommendations...")
+        sb.table("geo_audits").update({
+            "progress_message": "Generating content recommendations...",
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }).eq("id", audit_id).execute()
+
+        alice_brief = generate_alice_brief(
+            results=all_result_rows,
+            keyword_gaps=keyword_gaps,
+            directory_results=directory_results,
+            serp_data=serp_comparison,
+            brand=params["brand_name"],
+            competitors=params["competitors"],
+        )
+        summary["alice_brief"] = alice_brief
+
+        # Store Alice brief in dedicated table (for Agent Alice to query)
+        try:
+            sb.table("geo_alice_briefs").insert({
+                "audit_id": audit_id,
+                "client_name": params["brand_name"],
+                "brief_json": alice_brief,
+                "status": "pending",
+            }).execute()
+        except Exception as brief_exc:
+            logger.warning(f"Failed to insert Alice brief (table may not exist): {brief_exc}")
+
+        # 5. Generate dashboard HTML
         dashboard_html = render_dashboard_from_data(
             rows=all_result_rows,
             client_name=params["brand_name"],
@@ -156,7 +237,7 @@ def run_audit_task(audit_id: str) -> None:
             template_path=TEMPLATE_PATH,
         )
 
-        # 5. Upload to Supabase Storage (upsert to handle re-runs)
+        # 6. Upload to Supabase Storage (upsert to handle re-runs)
         filename = f"{audit_id}/dashboard.html"
         sb.storage.from_("geo-dashboards").upload(
             filename,
@@ -165,8 +246,7 @@ def run_audit_task(audit_id: str) -> None:
         )
         dashboard_url = sb.storage.from_("geo-dashboards").get_public_url(filename)
 
-        # 6. Generate summary and mark complete
-        summary = generate_summary_dict(results, params["brand_name"])
+        # 7. Mark complete with full summary
         elapsed = int(time.time() - start_time)
 
         sb.table("geo_audits").update({

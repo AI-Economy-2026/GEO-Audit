@@ -10,11 +10,13 @@ The only change: run_audit() accepts an optional progress_callback.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import re
 import time
 import urllib.parse
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Callable, Optional
@@ -39,6 +41,7 @@ except ImportError:
 SUPPORTED_ENGINES = (
     "openai", "anthropic", "google", "perplexity", "xai",
     "deepseek", "meta_llama", "google_ai_mode", "google_ai_overview",
+    "bing_copilot",
 )
 
 ENGINE_DISPLAY_NAMES = {
@@ -51,6 +54,7 @@ ENGINE_DISPLAY_NAMES = {
     "meta_llama": "Meta (Llama)",
     "google_ai_mode": "Google AI Mode",
     "google_ai_overview": "Google AI Overview",
+    "bing_copilot": "Bing (Copilot)",
 }
 
 ENGINE_MODELS = {
@@ -65,6 +69,20 @@ ENGINE_MODELS = {
 
 RATE_LIMIT_SECONDS = 1.0
 MAX_RETRIES = 1
+
+# Per-engine rate limits for parallel execution
+ENGINE_RATE_LIMITS = {
+    "openai": 0.5,
+    "anthropic": 1.0,
+    "google": 0.5,
+    "perplexity": 1.0,
+    "xai": 1.0,
+    "deepseek": 1.0,
+    "meta_llama": 1.0,
+    "google_ai_mode": 2.0,
+    "google_ai_overview": 2.0,
+    "bing_copilot": 2.0,
+}
 
 
 # ---------------------------------------------------------------------------
@@ -276,6 +294,40 @@ def query_google_ai_overview(prompt_text: str) -> str:
     return str(ai_overview)
 
 
+def query_bing_copilot(prompt_text: str) -> str:
+    import urllib.request
+    import urllib.error
+
+    api_key = os.getenv("SERPAPI_API_KEY")
+    if not api_key:
+        raise EnvironmentError("SERPAPI_API_KEY is not set.")
+    params = urllib.parse.urlencode({
+        "engine": "bing",
+        "q": prompt_text,
+        "api_key": api_key,
+    })
+    url = f"https://serpapi.com/search.json?{params}"
+    req = urllib.request.Request(url)
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        result = json.loads(resp.read().decode("utf-8"))
+    # Extract AI-generated content or organic snippets
+    ai_overview = result.get("ai_overview", {})
+    if ai_overview:
+        if isinstance(ai_overview, dict) and "text" in ai_overview:
+            return ai_overview["text"]
+        return str(ai_overview)
+    organic = result.get("organic_results", [])
+    if organic:
+        parts = []
+        for r in organic[:5]:
+            snippet = r.get("snippet", "")
+            title = r.get("title", "")
+            if snippet:
+                parts.append(f"{title}: {snippet}")
+        return "\n".join(parts) if parts else "[NO RESPONSE] Bing returned no content."
+    return "[NO RESPONSE] Bing Copilot returned no content."
+
+
 ENGINE_QUERY_FNS = {
     "openai": query_openai,
     "anthropic": query_anthropic,
@@ -286,6 +338,7 @@ ENGINE_QUERY_FNS = {
     "meta_llama": query_meta_llama,
     "google_ai_mode": query_google_ai_mode,
     "google_ai_overview": query_google_ai_overview,
+    "bing_copilot": query_bing_copilot,
 }
 
 # Map engine to required env var
@@ -299,6 +352,7 @@ ENGINE_KEY_MAP = {
     "meta_llama": "META_LLAMA_API_KEY",
     "google_ai_mode": "SERPAPI_API_KEY",
     "google_ai_overview": "SERPAPI_API_KEY",
+    "bing_copilot": "SERPAPI_API_KEY",
 }
 
 
@@ -537,3 +591,125 @@ def generate_summary_dict(
         },
         "sentiment_breakdown": sentiment_counts,
     }
+
+
+# ---------------------------------------------------------------------------
+# Async audit loop (engine-level parallelism)
+# ---------------------------------------------------------------------------
+async def _run_engine_prompts(
+    engine: str,
+    prompts: list[Prompt],
+    brand: str,
+    url: str,
+    competitors: list[str],
+    executor: ThreadPoolExecutor,
+    progress_lock: asyncio.Lock,
+    progress_counter: list[int],
+    total_tasks: int,
+    progress_callback: Optional[ProgressCallback],
+) -> list[AuditResult]:
+    """Run all prompts for a single engine sequentially with rate limiting."""
+    results: list[AuditResult] = []
+    rate_limit = ENGINE_RATE_LIMITS.get(engine, 1.0)
+    loop = asyncio.get_event_loop()
+
+    for prompt in prompts:
+        result = AuditResult(
+            prompt_id=prompt.prompt_id,
+            category=prompt.category,
+            prompt_text=prompt.prompt_text,
+            engine=engine,
+            timestamp=datetime.now(timezone.utc).isoformat(),
+        )
+
+        query_fn = ENGINE_QUERY_FNS[engine]
+        response_text = ""
+        success = False
+
+        for attempt in range(1, MAX_RETRIES + 2):
+            try:
+                response_text = await loop.run_in_executor(
+                    executor, query_fn, prompt.prompt_text
+                )
+                success = True
+                break
+            except Exception as exc:
+                if attempt <= MAX_RETRIES:
+                    await asyncio.sleep(rate_limit)
+                else:
+                    response_text = f"[ERROR] {exc.__class__.__name__}: {exc}"
+
+        if success:
+            analysis = analyse_response(response_text, brand, url, competitors)
+            result.brand_mentioned = analysis["brand_mentioned"]
+            result.position_rank = analysis["position_rank"]
+            result.url_cited = analysis["url_cited"]
+            result.competitor_mentions = analysis["competitor_mentions"]
+            result.sentiment = analysis["sentiment"]
+            result.response_text = response_text
+        else:
+            result.response_text = response_text
+
+        results.append(result)
+
+        # Thread-safe progress update
+        async with progress_lock:
+            progress_counter[0] += 1
+            completed = progress_counter[0]
+
+        if progress_callback:
+            progress_callback(completed, total_tasks, result)
+
+        # Rate limiting between prompts
+        await asyncio.sleep(rate_limit)
+
+    return results
+
+
+async def run_audit_async(
+    prompts: list[Prompt],
+    brand: str,
+    url: str,
+    competitors: list[str],
+    engines: list[str],
+    progress_callback: Optional[ProgressCallback] = None,
+) -> list[AuditResult]:
+    """
+    Run the audit with engine-level parallelism.
+
+    Each engine processes all prompts sequentially (respecting its rate limit),
+    but all engines run concurrently via asyncio.gather().
+    """
+    total_tasks = len(prompts) * len(engines)
+    progress_lock = asyncio.Lock()
+    progress_counter = [0]
+
+    executor = ThreadPoolExecutor(max_workers=len(engines))
+
+    try:
+        tasks = [
+            _run_engine_prompts(
+                engine=engine,
+                prompts=prompts,
+                brand=brand,
+                url=url,
+                competitors=competitors,
+                executor=executor,
+                progress_lock=progress_lock,
+                progress_counter=progress_counter,
+                total_tasks=total_tasks,
+                progress_callback=progress_callback,
+            )
+            for engine in engines
+        ]
+
+        engine_results = await asyncio.gather(*tasks)
+
+        # Flatten results
+        all_results: list[AuditResult] = []
+        for result_list in engine_results:
+            all_results.extend(result_list)
+
+        return all_results
+    finally:
+        executor.shutdown(wait=False)
