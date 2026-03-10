@@ -1,0 +1,1090 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GEO Audit — {{CLIENT_NAME}} | BALMER AGENCY</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   GEO AUDIT DASHBOARD — BALMER AGENCY
+   Mirvac-matching light theme — self-contained
+   ============================================================ */
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  line-height: 1.6;
+  color: #333;
+  background: #fff;
+}
+
+.container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 40px 20px;
+}
+
+/* ============================================================
+   SECTION 1: HEADER
+   ============================================================ */
+.header {
+  background: #000;
+  color: #fff;
+  padding: 40px 20px;
+  margin: -40px -20px 50px -20px;
+  text-align: center;
+}
+.logo-text {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 32px;
+  letter-spacing: 3px;
+}
+.client-logo {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 56px;
+  letter-spacing: 4px;
+  margin: 20px 0;
+}
+.report-date {
+  font-size: 14px;
+  color: #ccc;
+  margin-top: 5px;
+}
+
+/* ============================================================
+   HEADINGS
+   ============================================================ */
+h2 {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 32px;
+  letter-spacing: 2px;
+  margin: 40px 0 20px 0;
+  border-bottom: 2px solid #000;
+  padding-bottom: 10px;
+}
+h3 {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 24px;
+  letter-spacing: 1px;
+  margin-top: 30px;
+}
+
+/* ============================================================
+   SECTION 2: EXECUTIVE SUMMARY
+   ============================================================ */
+.exec-summary {
+  background: #f9f9f9;
+  padding: 40px;
+  margin: 40px 0;
+  border-left: 5px solid #000;
+}
+.exec-summary p {
+  font-size: 16px;
+  line-height: 1.8;
+  margin-bottom: 15px;
+}
+.highlight-stat {
+  display: inline-block;
+  background: #000;
+  color: #fff;
+  padding: 3px 8px;
+  font-weight: bold;
+}
+
+/* ============================================================
+   SECTION 3: KPI GRID
+   ============================================================ */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 20px;
+  margin: 40px 0;
+}
+.kpi-card {
+  background: #000;
+  color: #fff;
+  padding: 30px;
+  text-align: center;
+}
+.kpi-label {
+  font-size: 12px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-bottom: 15px;
+}
+.kpi-value {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 48px;
+  letter-spacing: 2px;
+}
+.kpi-subtitle {
+  font-size: 12px;
+  margin-top: 10px;
+  opacity: 0.8;
+}
+
+/* ============================================================
+   SECTION 4: RANKINGS TABLES
+   ============================================================ */
+.rankings-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 20px 0 40px 0;
+}
+.rankings-table thead {
+  background: #000;
+  color: #fff;
+}
+.rankings-table th {
+  padding: 15px;
+  text-align: left;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 14px;
+  letter-spacing: 1px;
+  font-weight: normal;
+}
+.rankings-table td {
+  padding: 15px;
+  border-bottom: 1px solid #e0e0e0;
+  font-size: 14px;
+}
+.rankings-table tbody tr:hover {
+  background: #f9f9f9;
+}
+.rankings-table tr.client-row {
+  background: #fffacd;
+}
+.rankings-table tr.client-row:hover {
+  background: #fff5b8;
+}
+.rank-badge {
+  display: inline-block;
+  background: #000;
+  color: #fff;
+  padding: 5px 12px;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 16px;
+  letter-spacing: 1px;
+  min-width: 40px;
+  text-align: center;
+}
+.share-bar-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.share-bar {
+  flex: 1;
+  height: 20px;
+  background: #e8e8e8;
+  position: relative;
+  max-width: 150px;
+}
+.share-fill {
+  height: 100%;
+  background: #ff9500;
+  transition: width 0.5s ease;
+}
+.share-text {
+  font-weight: bold;
+  min-width: 45px;
+  font-size: 15px;
+}
+
+/* ============================================================
+   SECTION 5: ENGINE PERFORMANCE
+   ============================================================ */
+.perf-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 20px;
+  margin: 20px 0 40px 0;
+}
+.perf-card {
+  padding: 30px 20px;
+  text-align: center;
+  border: 2px solid #e0e0e0;
+}
+.perf-card.strong {
+  border-color: #2e7d32;
+  background: #f0faf0;
+}
+.perf-card.gap {
+  border-color: #d32f2f;
+  background: #fff5f5;
+}
+.perf-card .perf-engine {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #666;
+}
+.perf-card .perf-value {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 48px;
+  letter-spacing: 1px;
+}
+.perf-card.strong .perf-value { color: #2e7d32; }
+.perf-card.gap .perf-value { color: #d32f2f; }
+.perf-card .perf-label {
+  font-size: 12px;
+  color: #999;
+  margin-top: 6px;
+}
+.perf-card .perf-detail {
+  font-size: 12px;
+  color: #666;
+  margin-top: 4px;
+}
+
+/* Category performance bars */
+.cat-perf-bar {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin: 12px 0;
+}
+.cat-perf-label {
+  min-width: 200px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.cat-perf-track {
+  flex: 1;
+  height: 28px;
+  background: #e8e8e8;
+  position: relative;
+}
+.cat-perf-fill {
+  height: 100%;
+  transition: width 0.5s ease;
+}
+.cat-perf-fill.high { background: #2e7d32; }
+.cat-perf-fill.med { background: #ff9500; }
+.cat-perf-fill.low { background: #d32f2f; }
+.cat-perf-pct {
+  min-width: 50px;
+  font-weight: bold;
+  font-size: 15px;
+  text-align: right;
+}
+
+/* Complete engine gap analysis table */
+.gap-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 20px 0 40px 0;
+}
+.gap-table thead {
+  background: #000;
+  color: #fff;
+}
+.gap-table th {
+  padding: 12px 15px;
+  text-align: left;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 14px;
+  letter-spacing: 1px;
+  font-weight: normal;
+}
+.gap-table td {
+  padding: 12px 15px;
+  border-bottom: 1px solid #e0e0e0;
+  font-size: 14px;
+}
+.gap-table tbody tr:hover {
+  background: #f9f9f9;
+}
+.priority-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: bold;
+  letter-spacing: 0.5px;
+}
+.priority-badge.critical { background: #d32f2f; color: #fff; }
+.priority-badge.high { background: #ff9500; color: #fff; }
+.priority-badge.medium { background: #ffd740; color: #333; }
+.priority-badge.low { background: #d4f4dd; color: #2e7d32; }
+
+/* ============================================================
+   SECTION 6: STRATEGIC INSIGHTS
+   ============================================================ */
+.insights-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+  margin: 20px 0;
+}
+.insight-card {
+  border: 1px solid #e0e0e0;
+  padding: 25px;
+}
+.insight-card h4 {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 18px;
+  letter-spacing: 1px;
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #000;
+}
+.insight-card ul {
+  list-style: none;
+}
+.insight-card ul li {
+  padding: 8px 0 8px 20px;
+  position: relative;
+  font-size: 14px;
+  line-height: 1.6;
+}
+.insight-card ul li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 16px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #000;
+}
+.insight-card:nth-child(1) ul li::before { background: #d32f2f; }
+.insight-card:nth-child(2) ul li::before { background: #ff9500; }
+.insight-card:nth-child(3) ul li::before { background: #2e7d32; }
+.insight-card:nth-child(4) ul li::before { background: #0066cc; }
+
+/* ============================================================
+   SECTION 7: DETAILED PROMPT ANALYSIS
+   ============================================================ */
+.category-tabs {
+  display: flex;
+  gap: 10px;
+  margin: 30px 0;
+  flex-wrap: wrap;
+}
+.tab-btn {
+  background: #fff;
+  border: 2px solid #000;
+  padding: 12px 25px;
+  cursor: pointer;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 16px;
+  letter-spacing: 1px;
+  transition: all 0.2s;
+}
+.tab-btn:hover { background: #f0f0f0; }
+.tab-btn.active { background: #000; color: #fff; }
+
+.prompt-item {
+  border: 1px solid #e0e0e0;
+  padding: 20px;
+  margin-bottom: 15px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.prompt-item:hover {
+  border-color: #999;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+.prompt-item.has-mention {
+  border-left: 5px solid #000;
+  background: #fffacd;
+}
+.prompt-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+}
+.prompt-left {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  flex: 1;
+}
+.prompt-number {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 20px;
+  min-width: 40px;
+  color: #999;
+}
+.prompt-text {
+  flex: 1;
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+.prompt-right {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  flex-shrink: 0;
+}
+.status-badge {
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: bold;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.status-badge.mentioned { background: #d4f4dd; color: #2e7d32; }
+.status-badge.not-mentioned { background: #ffeaea; color: #d32f2f; }
+.prompt-stats {
+  display: flex;
+  gap: 15px;
+  font-size: 14px;
+  color: #666;
+}
+.stat-group {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.stat-number { font-weight: bold; color: #0066cc; }
+.stat-number.sources { color: #ff9500; }
+.stat-label { color: #999; }
+.expand-arrow {
+  font-size: 18px;
+  color: #999;
+  transition: transform 0.2s;
+}
+.prompt-item.expanded .expand-arrow { transform: rotate(180deg); }
+
+.engines-grid {
+  display: none;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 10px;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 2px solid #e8e8e8;
+}
+.engines-grid.show { display: grid; }
+.engine-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 15px;
+  background: #f5f5f5;
+  border-radius: 4px;
+}
+.engine-item.has-mention {
+  background: #d4f4dd;
+  border-left: 3px solid #2e7d32;
+  cursor: pointer;
+}
+.engine-item.has-mention:hover { background: #c8efd3; }
+.engine-name { font-weight: 600; font-size: 13px; }
+.engine-status { font-size: 12px; }
+.mention-check { color: #2e7d32; font-weight: bold; font-size: 11px; }
+.mention-miss { color: #d32f2f; font-size: 11px; }
+
+/* Pagination */
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 20px;
+  margin: 40px 0;
+  padding: 20px;
+}
+.pagination-btn {
+  padding: 12px 30px;
+  background: #fff;
+  border: 2px solid #000;
+  cursor: pointer;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 16px;
+  letter-spacing: 1px;
+  transition: all 0.2s;
+}
+.pagination-btn:hover:not(:disabled) { background: #000; color: #fff; }
+.pagination-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+.page-info {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 18px;
+  letter-spacing: 1px;
+}
+
+/* ============================================================
+   MODAL
+   ============================================================ */
+.modal {
+  display: none;
+  position: fixed;
+  z-index: 1000;
+  left: 0; top: 0;
+  width: 100%; height: 100%;
+  background-color: rgba(0,0,0,0.7);
+  overflow: auto;
+}
+.modal-content {
+  background-color: #fff;
+  margin: 5% auto;
+  padding: 30px;
+  border: 2px solid #000;
+  width: 90%;
+  max-width: 800px;
+  max-height: 80vh;
+  overflow-y: auto;
+  position: relative;
+}
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 2px solid #000;
+}
+.modal-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 24px;
+  letter-spacing: 1px;
+  flex: 1;
+}
+.modal-close {
+  font-size: 32px;
+  font-weight: bold;
+  color: #999;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0 10px;
+}
+.modal-close:hover { color: #000; }
+.mention-item {
+  background: #fffacd;
+  padding: 25px;
+  margin: 20px 0;
+  border-left: 4px solid #000;
+  line-height: 1.9;
+  font-size: 15px;
+  font-family: Georgia, serif;
+}
+.mention-item mark {
+  background: #000;
+  color: #fff;
+  padding: 3px 6px;
+  font-weight: bold;
+  border-radius: 2px;
+}
+.mention-number {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 14px;
+  letter-spacing: 1px;
+  color: #666;
+  margin-bottom: 10px;
+}
+.no-mentions {
+  padding: 20px;
+  text-align: center;
+  color: #666;
+  font-style: italic;
+}
+
+/* ============================================================
+   FOOTER
+   ============================================================ */
+.footer {
+  text-align: center;
+  padding: 40px 20px;
+  margin-top: 40px;
+  border-top: 2px solid #000;
+}
+.footer .foot-brand {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 24px;
+  letter-spacing: 3px;
+}
+.footer .foot-copy {
+  font-size: 13px;
+  color: #999;
+  margin-top: 8px;
+}
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+@media (max-width: 768px) {
+  .client-logo { font-size: 42px; }
+  .kpi-grid { grid-template-columns: 1fr; }
+  .engines-grid { grid-template-columns: 1fr; }
+  .prompt-header { flex-direction: column; align-items: flex-start; }
+  .prompt-left { flex-direction: column; align-items: flex-start; gap: 10px; }
+  .prompt-right { flex-direction: column; align-items: flex-start; width: 100%; gap: 10px; }
+  .prompt-stats { width: 100%; justify-content: space-between; }
+  .rankings-table, .gap-table { font-size: 13px; }
+  .rankings-table th, .rankings-table td,
+  .gap-table th, .gap-table td { padding: 10px 5px; }
+  .share-bar { max-width: 100px; }
+  .cat-perf-label { min-width: 120px; }
+  .perf-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+<!-- ============================================================
+     SECTION 1: HEADER
+     ============================================================ -->
+<div class="header">
+  <div class="logo-text">BALMER AGENCY</div>
+  <div class="client-logo">{{CLIENT_NAME}}</div>
+  <div class="report-date">GEO Audit Dashboard &mdash; {{REPORT_DATE}}</div>
+</div>
+
+<!-- ============================================================
+     SECTION 2: EXECUTIVE SUMMARY
+     ============================================================ -->
+<div class="exec-summary">
+  <p>{{EXECUTIVE_SUMMARY}}</p>
+  <p>{{CLIENT_NAME}} achieves a <span class="highlight-stat">{{VISIBILITY_RATE}}% visibility rate</span> across <span class="highlight-stat">{{TOTAL_PROMPTS}} search prompts</span>, with strongest performance in {{BEST_CATEGORY}} and key optimisation opportunities in {{WORST_CATEGORY}}.</p>
+</div>
+
+<!-- ============================================================
+     SECTION 3: PERFORMANCE OVERVIEW (KPIs)
+     ============================================================ -->
+<h2>Performance Overview</h2>
+<div class="kpi-grid">
+  <div class="kpi-card">
+    <div class="kpi-label">Total Prompts Analysed</div>
+    <div class="kpi-value">{{TOTAL_PROMPTS}}</div>
+    <div class="kpi-subtitle">Across {{CATEGORY_COUNT}} categories</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">Visibility Rate</div>
+    <div class="kpi-value">{{VISIBILITY_RATE}}%</div>
+    <div class="kpi-subtitle">{{TOTAL_MENTIONED}} of {{TOTAL_QUERIES}} queries</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">AI Engines Tested</div>
+    <div class="kpi-value">{{ENGINE_COUNT}}</div>
+    <div class="kpi-subtitle">{{ENGINE_NAMES_SHORT}}</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">Best Performance</div>
+    <div class="kpi-value">#{{BEST_RANK}}</div>
+    <div class="kpi-subtitle">Highest ranking achieved</div>
+  </div>
+</div>
+
+<!-- ============================================================
+     SECTION 4: RANKINGS BY CATEGORY
+     ============================================================ -->
+<h2>{{CLIENT_NAME}} Rankings by Category</h2>
+
+<div id="rankingsContainer">
+  <!-- Populated by JavaScript from CATEGORY_RANKINGS data -->
+</div>
+
+<!-- ============================================================
+     SECTION 5: AI ENGINE PERFORMANCE & OPPORTUNITIES
+     ============================================================ -->
+<h2>AI Engine Performance &amp; Opportunities</h2>
+
+<h3>Strong Performance</h3>
+<div id="strongEngines" class="perf-grid">
+  <!-- Populated by JavaScript -->
+</div>
+
+<h3>Critical Optimisation Gaps</h3>
+<div id="gapEngines" class="perf-grid">
+  <!-- Populated by JavaScript -->
+</div>
+
+<h3>Category Performance</h3>
+<div id="categoryBars">
+  <!-- Populated by JavaScript -->
+</div>
+
+<h3>Complete Engine Gap Analysis</h3>
+<table class="gap-table">
+  <thead>
+    <tr>
+      <th>AI Engine</th>
+      <th>Tested</th>
+      <th>Mentioned</th>
+      <th>Mention Rate</th>
+      <th>Missed</th>
+      <th>Priority</th>
+    </tr>
+  </thead>
+  <tbody id="gapTableBody">
+    <!-- Populated by JavaScript -->
+  </tbody>
+</table>
+
+<!-- ============================================================
+     SECTION 6: STRATEGIC INSIGHTS & RECOMMENDATIONS
+     ============================================================ -->
+<h2>Strategic Insights &amp; Recommendations</h2>
+<div class="insights-grid">
+  <div class="insight-card">
+    <h4>Immediate Priorities</h4>
+    <ul>
+      <li>{{REC_PRIORITY_1}}</li>
+      <li>{{REC_PRIORITY_2}}</li>
+      <li>{{REC_PRIORITY_3}}</li>
+    </ul>
+  </div>
+  <div class="insight-card">
+    <h4>Sector-Specific Guidance</h4>
+    <ul>
+      <li>{{REC_SECTOR_1}}</li>
+      <li>{{REC_SECTOR_2}}</li>
+      <li>{{REC_SECTOR_3}}</li>
+    </ul>
+  </div>
+  <div class="insight-card">
+    <h4>Leverage Success</h4>
+    <ul>
+      <li>{{REC_LEVERAGE_1}}</li>
+      <li>{{REC_LEVERAGE_2}}</li>
+      <li>{{REC_LEVERAGE_3}}</li>
+    </ul>
+  </div>
+  <div class="insight-card">
+    <h4>Key Findings</h4>
+    <ul>
+      <li>{{FINDING_1}}</li>
+      <li>{{FINDING_2}}</li>
+      <li>{{FINDING_3}}</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ============================================================
+     SECTION 7: DETAILED PROMPT ANALYSIS
+     ============================================================ -->
+<h2>Detailed Prompt Analysis</h2>
+
+<div class="category-tabs" id="categoryTabs">
+  <button class="tab-btn active" data-cat="all">All Prompts</button>
+  <!-- Additional tabs populated by JS -->
+</div>
+
+<div id="promptList">
+  <!-- Populated by JavaScript -->
+</div>
+
+<div class="pagination" id="pagination">
+  <button class="pagination-btn" id="prevBtn" onclick="changePage(-1)">&#8592; Previous</button>
+  <span class="page-info" id="pageInfo">Page 1 of 1</span>
+  <button class="pagination-btn" id="nextBtn" onclick="changePage(1)">Next &#8594;</button>
+</div>
+
+<!-- ============================================================
+     FOOTER
+     ============================================================ -->
+<footer class="footer">
+  <div class="foot-brand">BALMER AGENCY</div>
+  <p class="foot-copy">Generative Engine Optimisation &nbsp;&middot;&nbsp; &copy; 2026</p>
+</footer>
+
+</div><!-- /.container -->
+
+<!-- ============================================================
+     MODAL FOR MENTION DETAILS
+     ============================================================ -->
+<div class="modal" id="mentionModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <div class="modal-title" id="modalTitle"></div>
+      <span class="modal-close" id="modalClose">&times;</span>
+    </div>
+    <div id="modalBody"></div>
+  </div>
+</div>
+
+<!-- ============================================================
+     DATA & JAVASCRIPT
+     ============================================================ -->
+<script>
+// --- DATA (injected by generate_dashboard.py) ---
+var ENGINE_DATA = {{ENGINE_DATA}};
+var PROMPT_DATA = {{PROMPT_DATA}};
+var CATEGORY_RANKINGS = {{CATEGORY_RANKINGS}};
+var CATEGORY_PERF = {{CATEGORY_PERF}};
+var CLIENT_NAME = "{{CLIENT_NAME}}";
+
+// ============================================================
+// SECTION 4: Rankings by Category
+// ============================================================
+(function renderRankings() {
+  var container = document.getElementById('rankingsContainer');
+  if (!CATEGORY_RANKINGS || !CATEGORY_RANKINGS.length) return;
+
+  CATEGORY_RANKINGS.forEach(function(cat) {
+    var section = document.createElement('div');
+    var h3El = document.createElement('h3');
+    h3El.textContent = cat.category;
+    section.appendChild(h3El);
+
+    var table = document.createElement('table');
+    table.className = 'rankings-table';
+
+    var thead = '<thead><tr><th>Rank</th><th>Brand</th><th>Mentions</th><th>Share of Voice</th></tr></thead>';
+    var tbody = '<tbody>';
+
+    cat.brands.forEach(function(b) {
+      var rowClass = b.isClient ? ' class="client-row"' : '';
+      tbody += '<tr' + rowClass + '>';
+      tbody += '<td><span class="rank-badge">#' + b.rank + '</span></td>';
+      tbody += '<td><strong>' + b.brand + '</strong></td>';
+      tbody += '<td>' + b.mentions + '</td>';
+      tbody += '<td><div class="share-bar-container"><div class="share-bar"><div class="share-fill" style="width:' + Math.min(b.sov, 100) + '%"></div></div><span class="share-text">' + b.sov + '%</span></div></td>';
+      tbody += '</tr>';
+    });
+
+    tbody += '</tbody>';
+    table.innerHTML = thead + tbody;
+    section.appendChild(table);
+    container.appendChild(section);
+  });
+})();
+
+// ============================================================
+// SECTION 5: Engine Performance Cards
+// ============================================================
+(function renderEnginePerformance() {
+  // Sort engines by rate descending
+  var sorted = ENGINE_DATA.slice().sort(function(a, b) { return b.rate - a.rate; });
+
+  // Strong: top engines (rate > 0)
+  var strong = sorted.filter(function(e) { return e.rate > 0; }).slice(0, 3);
+  var gaps = sorted.slice().reverse().filter(function(e) { return e.gap > 0; }).slice(0, 3);
+
+  var strongEl = document.getElementById('strongEngines');
+  strong.forEach(function(e) {
+    strongEl.innerHTML += '<div class="perf-card strong">' +
+      '<div class="perf-engine">' + e.name + '</div>' +
+      '<div class="perf-value">' + e.rate + '%</div>' +
+      '<div class="perf-label">Mention Rate</div>' +
+      '<div class="perf-detail">' + e.mentioned + ' of ' + e.total + ' queries</div>' +
+      '</div>';
+  });
+
+  var gapEl = document.getElementById('gapEngines');
+  gaps.forEach(function(e) {
+    gapEl.innerHTML += '<div class="perf-card gap">' +
+      '<div class="perf-engine">' + e.name + '</div>' +
+      '<div class="perf-value">' + e.gap + '%</div>' +
+      '<div class="perf-label">Gap</div>' +
+      '<div class="perf-detail">' + e.missed + ' missed opportunities</div>' +
+      '</div>';
+  });
+
+  // Gap analysis table
+  var tbody = document.getElementById('gapTableBody');
+  sorted.forEach(function(e) {
+    var priority = 'low';
+    var label = 'Low';
+    if (e.gap >= 70) { priority = 'critical'; label = 'Critical'; }
+    else if (e.gap >= 50) { priority = 'high'; label = 'High'; }
+    else if (e.gap >= 30) { priority = 'medium'; label = 'Medium'; }
+
+    tbody.innerHTML += '<tr>' +
+      '<td><strong>' + e.name + '</strong></td>' +
+      '<td>' + e.total + '</td>' +
+      '<td>' + e.mentioned + '</td>' +
+      '<td>' + e.rate + '%</td>' +
+      '<td>' + e.missed + '</td>' +
+      '<td><span class="priority-badge ' + priority + '">' + label + '</span></td>' +
+      '</tr>';
+  });
+})();
+
+// ============================================================
+// SECTION 5b: Category Performance Bars
+// ============================================================
+(function renderCategoryBars() {
+  var container = document.getElementById('categoryBars');
+  if (!CATEGORY_PERF || !CATEGORY_PERF.length) return;
+
+  CATEGORY_PERF.forEach(function(cat) {
+    var fillClass = 'low';
+    if (cat.visibility >= 60) fillClass = 'high';
+    else if (cat.visibility >= 35) fillClass = 'med';
+
+    container.innerHTML += '<div class="cat-perf-bar">' +
+      '<div class="cat-perf-label">' + cat.name + '</div>' +
+      '<div class="cat-perf-track"><div class="cat-perf-fill ' + fillClass + '" style="width:' + cat.visibility + '%"></div></div>' +
+      '<div class="cat-perf-pct">' + cat.visibility + '%</div>' +
+      '</div>';
+  });
+})();
+
+// ============================================================
+// SECTION 7: Detailed Prompt Analysis (Interactive)
+// ============================================================
+var ITEMS_PER_PAGE = 5;
+var currentPage = 1;
+var currentCategory = 'all';
+var filteredPrompts = PROMPT_DATA.slice();
+
+// Build category tabs
+(function buildTabs() {
+  var tabContainer = document.getElementById('categoryTabs');
+  var cats = {};
+  PROMPT_DATA.forEach(function(p) { cats[p.category] = true; });
+
+  // Add "MENTIONED" tab
+  Object.keys(cats).forEach(function(cat) {
+    var btn = document.createElement('button');
+    btn.className = 'tab-btn';
+    btn.setAttribute('data-cat', cat);
+    btn.textContent = cat;
+    btn.onclick = function() { filterByCategory(cat); };
+    tabContainer.appendChild(btn);
+  });
+
+  // Mentioned tab
+  var mentionedBtn = document.createElement('button');
+  mentionedBtn.className = 'tab-btn';
+  mentionedBtn.setAttribute('data-cat', 'mentioned');
+  mentionedBtn.textContent = CLIENT_NAME + ' Mentioned';
+  mentionedBtn.onclick = function() { filterByCategory('mentioned'); };
+  tabContainer.appendChild(mentionedBtn);
+
+  // All tab click handler
+  tabContainer.querySelector('[data-cat="all"]').onclick = function() { filterByCategory('all'); };
+})();
+
+function filterByCategory(cat) {
+  currentCategory = cat;
+  currentPage = 1;
+
+  if (cat === 'all') {
+    filteredPrompts = PROMPT_DATA.slice();
+  } else if (cat === 'mentioned') {
+    filteredPrompts = PROMPT_DATA.filter(function(p) {
+      return Object.values(p.engines).some(function(e) { return e.mentioned; });
+    });
+  } else {
+    filteredPrompts = PROMPT_DATA.filter(function(p) { return p.category === cat; });
+  }
+
+  // Update active tab
+  document.querySelectorAll('.tab-btn').forEach(function(btn) {
+    btn.classList.toggle('active', btn.getAttribute('data-cat') === cat);
+  });
+
+  renderPrompts();
+}
+
+function renderPrompts() {
+  var container = document.getElementById('promptList');
+  container.innerHTML = '';
+
+  var start = (currentPage - 1) * ITEMS_PER_PAGE;
+  var end = Math.min(start + ITEMS_PER_PAGE, filteredPrompts.length);
+  var pagePrompts = filteredPrompts.slice(start, end);
+
+  pagePrompts.forEach(function(p) {
+    var engines = p.engines;
+    var engineNames = Object.keys(engines);
+    var mentionCount = engineNames.filter(function(e) { return engines[e].mentioned; }).length;
+    var hasMention = mentionCount > 0;
+
+    var item = document.createElement('div');
+    item.className = 'prompt-item' + (hasMention ? ' has-mention' : '');
+
+    // Header
+    var header = '<div class="prompt-header">';
+    header += '<div class="prompt-left">';
+    header += '<span class="prompt-number">' + String(p.id).padStart(2, '0') + '</span>';
+    header += '<span class="prompt-text">' + p.prompt + '</span>';
+    header += '</div>';
+    header += '<div class="prompt-right">';
+
+    if (hasMention) {
+      header += '<span class="status-badge mentioned">&#10003; ' + CLIENT_NAME + ' Mentioned</span>';
+    } else {
+      header += '<span class="status-badge not-mentioned">&#10007; Not Mentioned</span>';
+    }
+
+    header += '<div class="prompt-stats">';
+    header += '<span class="stat-group"><span class="stat-number">' + mentionCount + '/' + engineNames.length + '</span> <span class="stat-label">engines</span></span>';
+    header += '</div>';
+    header += '<span class="expand-arrow">&#9660;</span>';
+    header += '</div></div>';
+
+    // Engine details grid
+    var grid = '<div class="engines-grid">';
+    engineNames.forEach(function(eName) {
+      var eData = engines[eName];
+      var itemClass = eData.mentioned ? 'engine-item has-mention' : 'engine-item';
+      grid += '<div class="' + itemClass + '" ' +
+        (eData.mentioned ? 'onclick="showMention(\'' + eName.replace(/'/g, "\\'") + '\', ' + JSON.stringify(p.prompt).replace(/"/g, '&quot;') + ', ' + JSON.stringify(eData.excerpt || '').replace(/"/g, '&quot;') + ')"' : '') + '>';
+      grid += '<span class="engine-name">' + eName + '</span>';
+      if (eData.mentioned) {
+        grid += '<span class="mention-check">&#10003; MENTIONED</span>';
+      } else {
+        grid += '<span class="mention-miss">&#10007; Not mentioned</span>';
+      }
+      grid += '</div>';
+    });
+    grid += '</div>';
+
+    item.innerHTML = header + grid;
+
+    // Toggle expand on click
+    item.addEventListener('click', function(e) {
+      if (e.target.closest('.engine-item.has-mention')) return;
+      item.classList.toggle('expanded');
+      var engGrid = item.querySelector('.engines-grid');
+      engGrid.classList.toggle('show');
+    });
+
+    container.appendChild(item);
+  });
+
+  // Update pagination
+  var totalPages = Math.ceil(filteredPrompts.length / ITEMS_PER_PAGE) || 1;
+  document.getElementById('pageInfo').textContent = 'Page ' + currentPage + ' of ' + totalPages;
+  document.getElementById('prevBtn').disabled = currentPage <= 1;
+  document.getElementById('nextBtn').disabled = currentPage >= totalPages;
+}
+
+function changePage(delta) {
+  var totalPages = Math.ceil(filteredPrompts.length / ITEMS_PER_PAGE) || 1;
+  currentPage = Math.max(1, Math.min(currentPage + delta, totalPages));
+  renderPrompts();
+  window.scrollTo({ top: document.getElementById('promptList').offsetTop - 100, behavior: 'smooth' });
+}
+
+// ============================================================
+// MODAL: Show Mention Details
+// ============================================================
+function showMention(engine, prompt, excerpt) {
+  var modal = document.getElementById('mentionModal');
+  document.getElementById('modalTitle').textContent = engine + ' — Mention Detail';
+
+  var body = '<div class="mention-number">Prompt: ' + prompt + '</div>';
+  if (excerpt && excerpt.length > 0) {
+    // Highlight client name in excerpt
+    var highlighted = excerpt.replace(new RegExp('(' + CLIENT_NAME.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi'), '<mark>$1</mark>');
+    body += '<div class="mention-item">' + highlighted + '</div>';
+  } else {
+    body += '<div class="no-mentions">No excerpt available for this mention.</div>';
+  }
+
+  document.getElementById('modalBody').innerHTML = body;
+  modal.style.display = 'block';
+}
+
+document.getElementById('modalClose').onclick = function() {
+  document.getElementById('mentionModal').style.display = 'none';
+};
+document.getElementById('mentionModal').onclick = function(e) {
+  if (e.target === this) this.style.display = 'none';
+};
+
+// Initial render
+renderPrompts();
+</script>
+</body>
+</html>

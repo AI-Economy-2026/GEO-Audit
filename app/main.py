@@ -1,0 +1,81 @@
+"""
+FastAPI entry point for the GEO Audit Worker.
+
+Endpoints:
+    GET  /api/health         — Health check
+    POST /api/audits/start   — Trigger a background audit task
+"""
+
+from __future__ import annotations
+
+import logging
+from contextlib import asynccontextmanager
+
+from fastapi import BackgroundTasks, FastAPI, Header, HTTPException
+from pydantic import BaseModel
+
+from app.config import WORKER_API_KEY
+from app.worker import run_audit_task
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info("GEO Audit Worker starting up...")
+    yield
+    logger.info("GEO Audit Worker shutting down.")
+
+
+app = FastAPI(
+    title="GEO Audit Worker",
+    description="Background worker for running GEO visibility audits",
+    version="1.0.0",
+    lifespan=lifespan,
+)
+
+
+class AuditStartRequest(BaseModel):
+    audit_id: str
+
+
+class HealthResponse(BaseModel):
+    status: str
+    service: str
+
+
+class AuditStartResponse(BaseModel):
+    status: str
+    audit_id: str
+
+
+@app.get("/api/health", response_model=HealthResponse)
+async def health():
+    """Health check endpoint for Railway."""
+    return HealthResponse(status="ok", service="geo-audit-worker")
+
+
+@app.post("/api/audits/start", response_model=AuditStartResponse)
+async def start_audit(
+    req: AuditStartRequest,
+    background_tasks: BackgroundTasks,
+    authorization: str = Header(...),
+):
+    """
+    Trigger a background audit task.
+
+    The caller must provide a valid Bearer token matching WORKER_API_KEY.
+    The audit_id must already exist in the geo_audits table.
+    """
+    # Verify shared secret
+    expected = f"Bearer {WORKER_API_KEY}"
+    if not WORKER_API_KEY or authorization != expected:
+        raise HTTPException(status_code=401, detail="Invalid worker API key.")
+
+    logger.info(f"Received audit start request: {req.audit_id}")
+
+    # Launch background task
+    background_tasks.add_task(run_audit_task, req.audit_id)
+
+    return AuditStartResponse(status="accepted", audit_id=req.audit_id)

@@ -1,0 +1,3 @@
+ALTER TABLE geo_clients ADD COLUMN IF NOT EXISTS contact_name TEXT;
+ALTER TABLE geo_clients ADD COLUMN IF NOT EXISTS contact_phone TEXT;
+ALTER TABLE geo_clients ADD COLUMN IF NOT EXISTS keywords TEXT[] NOT NULL DEFAULT '{}';
