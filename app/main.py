@@ -62,12 +62,15 @@ async def health():
 async def debug_env():
     """Temporary: check which env vars are loaded."""
     key = os.environ.get("WORKER_API_KEY", "")
+    sb_url = os.environ.get("SUPABASE_URL", "")
+    sb_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
     return {
         "worker_key_length": len(key),
         "worker_key_first5": key[:5] if key else "EMPTY",
-        "supabase_url_set": bool(os.environ.get("SUPABASE_URL")),
-        "config_key_length": len(WORKER_API_KEY),
-        "config_key_first5": WORKER_API_KEY[:5] if WORKER_API_KEY else "EMPTY",
+        "supabase_url": sb_url[:40] if sb_url else "EMPTY",
+        "supabase_key_length": len(sb_key),
+        "supabase_key_first10": sb_key[:10] if sb_key else "EMPTY",
+        "supabase_key_last5": sb_key[-5:] if sb_key else "EMPTY",
     }
 
 
