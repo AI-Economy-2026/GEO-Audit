@@ -58,6 +58,19 @@ async def health():
     return HealthResponse(status="ok", service="geo-audit-worker")
 
 
+@app.get("/api/debug-env")
+async def debug_env():
+    """Temporary: check which env vars are loaded."""
+    key = os.environ.get("WORKER_API_KEY", "")
+    return {
+        "worker_key_length": len(key),
+        "worker_key_first5": key[:5] if key else "EMPTY",
+        "supabase_url_set": bool(os.environ.get("SUPABASE_URL")),
+        "config_key_length": len(WORKER_API_KEY),
+        "config_key_first5": WORKER_API_KEY[:5] if WORKER_API_KEY else "EMPTY",
+    }
+
+
 @app.post("/api/audits/start", response_model=AuditStartResponse)
 async def start_audit(
     req: AuditStartRequest,
