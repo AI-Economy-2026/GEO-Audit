@@ -281,6 +281,233 @@ def run_audit_task(audit_id: str) -> None:
         _mark_failed(sb, audit_id, str(exc))
 
 
+def run_audit_extension(audit_id: str, prompt_ids: list[int]) -> None:
+    """
+    Run additional prompts for an existing completed audit.
+
+    1. Load only the specified prompt_ids
+    2. Query engines for just those prompts
+    3. Re-read ALL results (old + new) and regenerate full summary
+    4. On failure: revert to completed (original data is intact)
+    """
+    sb = get_supabase()
+    start_time = time.time()
+
+    try:
+        # Load audit params
+        audit = (
+            sb.table("geo_audits")
+            .select("*")
+            .eq("id", audit_id)
+            .single()
+            .execute()
+        )
+        params = audit.data
+
+        # Load only the new prompts
+        prompts_resp = (
+            sb.table("geo_audit_prompts")
+            .select("*")
+            .eq("audit_id", audit_id)
+            .in_("prompt_id", prompt_ids)
+            .order("prompt_id")
+            .execute()
+        )
+        new_prompts = [
+            Prompt(
+                prompt_id=p["prompt_id"],
+                category=p["category"],
+                prompt_text=p["prompt_text"],
+            )
+            for p in prompts_resp.data
+        ]
+
+        if not new_prompts:
+            logger.warning(f"Extension {audit_id}: No prompts found for IDs {prompt_ids}")
+            sb.table("geo_audits").update({
+                "status": "completed",
+                "progress_message": "No new prompts to run.",
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }).eq("id", audit_id).execute()
+            return
+
+        engines = params["engines"]
+        total = len(new_prompts) * len(engines)
+        new_result_rows: list[dict] = []
+
+        def on_progress(completed: int, total_count: int, result: AuditResult) -> None:
+            engine_display = ENGINE_DISPLAY_NAMES.get(result.engine, result.engine)
+
+            row_data = {
+                "audit_id": audit_id,
+                "prompt_id": result.prompt_id,
+                "category": result.category,
+                "prompt_text": result.prompt_text,
+                "engine": result.engine,
+                "engine_display": engine_display,
+                "brand_mentioned": result.brand_mentioned,
+                "position_rank": result.position_rank,
+                "url_cited": result.url_cited,
+                "competitor_mentions": result.competitor_mentions,
+                "sentiment": result.sentiment,
+                "response_text": result.response_text[:10000],
+            }
+            sb.table("geo_audit_results").insert(row_data).execute()
+            new_result_rows.append(row_data)
+
+            mention_str = "mentioned" if result.brand_mentioned else "not mentioned"
+            sb.table("geo_audits").update({
+                "progress_current": completed,
+                "progress_message": (
+                    f"[{completed}/{total_count}] {engine_display} — "
+                    f"Prompt #{result.prompt_id}: {mention_str}"
+                ),
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }).eq("id", audit_id).execute()
+
+        # Run only new prompts
+        logger.info(f"Extension {audit_id}: Running {len(new_prompts)} new prompts across {len(engines)} engines")
+        asyncio.run(run_audit_async(
+            prompts=new_prompts,
+            brand=params["brand_name"],
+            url=params["brand_url"],
+            competitors=params["competitors"],
+            engines=engines,
+            progress_callback=on_progress,
+        ))
+
+        # Now regenerate full summary from ALL results
+        sb.table("geo_audits").update({
+            "progress_message": "Recalculating results...",
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }).eq("id", audit_id).execute()
+
+        all_results_resp = (
+            sb.table("geo_audit_results")
+            .select("*")
+            .eq("audit_id", audit_id)
+            .execute()
+        )
+        all_result_rows = all_results_resp.data
+
+        # Convert to AuditResult objects for summary generation
+        all_audit_results = [
+            AuditResult(
+                prompt_id=r["prompt_id"],
+                category=r["category"],
+                prompt_text=r["prompt_text"],
+                engine=r["engine"],
+                brand_mentioned=r["brand_mentioned"],
+                position_rank=r["position_rank"],
+                url_cited=r["url_cited"],
+                competitor_mentions=r.get("competitor_mentions", []),
+                sentiment=r.get("sentiment", "neutral"),
+                response_text=r.get("response_text", ""),
+            )
+            for r in all_result_rows
+        ]
+
+        summary = generate_summary_dict(all_audit_results, params["brand_name"])
+
+        # Re-run analysis modules on full dataset
+        logger.info(f"Extension {audit_id}: Running analysis on full dataset ({len(all_result_rows)} results)")
+
+        keyword_gaps = analyse_keyword_gaps(
+            results=all_result_rows,
+            brand=params["brand_name"],
+            competitors=params["competitors"],
+        )
+        summary["keyword_gap_analysis"] = keyword_gaps
+
+        directory_results = check_directories(params["brand_name"])
+        summary["directory_citations"] = directory_results
+
+        # Load all prompts for SERP analysis
+        all_prompts_resp = (
+            sb.table("geo_audit_prompts")
+            .select("*")
+            .eq("audit_id", audit_id)
+            .order("prompt_id")
+            .execute()
+        )
+        prompt_dicts = [
+            {"prompt_id": p["prompt_id"], "prompt_text": p["prompt_text"]}
+            for p in all_prompts_resp.data
+        ]
+
+        site_index = check_site_index(params["brand_url"])
+        organic_rankings = check_organic_rankings(prompt_dicts, params["brand_url"])
+        serp_comparison = compare_ai_vs_seo(all_result_rows, organic_rankings)
+        summary["serp_analysis"] = {
+            "site_indexed": site_index,
+            "organic_rankings": organic_rankings,
+            "comparisons": serp_comparison["comparisons"],
+            "summary": serp_comparison["summary"],
+        }
+
+        alice_brief = generate_alice_brief(
+            results=all_result_rows,
+            keyword_gaps=keyword_gaps,
+            directory_results=directory_results,
+            serp_data=serp_comparison,
+            brand=params["brand_name"],
+            competitors=params["competitors"],
+        )
+        summary["alice_brief"] = alice_brief
+
+        try:
+            sb.table("geo_alice_briefs").insert({
+                "audit_id": audit_id,
+                "client_name": params["brand_name"],
+                "brief_json": alice_brief,
+                "status": "pending",
+            }).execute()
+        except Exception as brief_exc:
+            logger.warning(f"Failed to insert Alice brief: {brief_exc}")
+
+        # Regenerate dashboard HTML
+        dashboard_html = render_dashboard_from_data(
+            rows=all_result_rows,
+            client_name=params["brand_name"],
+            client_url=params["brand_url"],
+            template_path=TEMPLATE_PATH,
+        )
+        filename = f"{audit_id}/dashboard.html"
+        sb.storage.from_("geo-dashboards").upload(
+            filename,
+            dashboard_html.encode("utf-8"),
+            file_options={"content-type": "text/html", "upsert": "true"},
+        )
+
+        # Mark complete with updated totals
+        elapsed = int(time.time() - start_time)
+        sb.table("geo_audits").update({
+            "status": "completed",
+            "summary_json": summary,
+            "visibility_rate": summary["overall_visibility"]["visibility_rate_percent"],
+            "total_queries": summary["audit_metadata"]["total_queries"],
+            "total_mentioned": summary["overall_visibility"]["brand_mentioned_count"],
+            "progress_current": total,
+            "progress_message": "Extended audit complete!",
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }).eq("id", audit_id).execute()
+
+        logger.info(
+            f"Extension {audit_id} completed in {elapsed}s. "
+            f"Total results: {len(all_result_rows)}, "
+            f"Visibility: {summary['overall_visibility']['visibility_rate_percent']}%"
+        )
+
+    except Exception as exc:
+        logger.exception(f"Extension {audit_id} failed: {exc}")
+        # Revert to completed — original data is still intact
+        sb.table("geo_audits").update({
+            "status": "completed",
+            "progress_message": f"Extension failed: {str(exc)[:200]}",
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }).eq("id", audit_id).execute()
+
+
 def _mark_failed(sb, audit_id: str, error_message: str) -> None:
     """Mark an audit as failed with an error message."""
     sb.table("geo_audits").update({

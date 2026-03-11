@@ -17,7 +17,7 @@ from pydantic import BaseModel
 import os
 
 from app.config import WORKER_API_KEY
-from app.worker import run_audit_task
+from app.worker import run_audit_task, run_audit_extension
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -40,6 +40,11 @@ app = FastAPI(
 
 class AuditStartRequest(BaseModel):
     audit_id: str
+
+
+class AuditExtendRequest(BaseModel):
+    audit_id: str
+    prompt_ids: list[int]
 
 
 class HealthResponse(BaseModel):
@@ -97,4 +102,21 @@ async def start_audit(
     # Launch background task
     background_tasks.add_task(run_audit_task, req.audit_id)
 
+    return AuditStartResponse(status="accepted", audit_id=req.audit_id)
+
+
+@app.post("/api/audits/extend", response_model=AuditStartResponse)
+async def extend_audit(
+    req: AuditExtendRequest,
+    background_tasks: BackgroundTasks,
+    authorization: str = Header(...),
+):
+    """Run additional prompts for an existing audit (incremental extension)."""
+    api_key = os.environ.get("WORKER_API_KEY", "") or WORKER_API_KEY
+    expected = f"Bearer {api_key}"
+    if not api_key or authorization != expected:
+        raise HTTPException(status_code=401, detail="Invalid worker API key.")
+
+    logger.info(f"Received extend request: {req.audit_id}, prompts: {req.prompt_ids}")
+    background_tasks.add_task(run_audit_extension, req.audit_id, req.prompt_ids)
     return AuditStartResponse(status="accepted", audit_id=req.audit_id)
