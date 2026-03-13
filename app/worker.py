@@ -11,11 +11,18 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-from app.supabase_client import get_supabase
+# Ensure the project root (parent of app/) is on sys.path so that
+# sibling packages like `engine` can be imported.
+_PROJECT_ROOT = str(Path(__file__).resolve().parent.parent)
+if _PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, _PROJECT_ROOT)
+
+from supabase_client import get_supabase
 from engine.geo_audit_engine import (
     AuditResult,
     ENGINE_DISPLAY_NAMES,
@@ -217,7 +224,7 @@ def run_audit_task(audit_id: str) -> None:
             competitors=params["competitors"],
         )
         summary["alice_brief"] = alice_brief
-
+        print("ALICE BRIEF", alice_brief)
         # Store Alice brief in dedicated table (for Agent Alice to query)
         try:
             sb.table("geo_alice_briefs").insert({
@@ -236,6 +243,7 @@ def run_audit_task(audit_id: str) -> None:
             client_url=params["brand_url"],
             template_path=TEMPLATE_PATH,
         )
+        print("Dashboard HTML", dashboard_html) 
 
         # 6. Upload to Supabase Storage (upsert to handle re-runs)
         filename = f"{audit_id}/dashboard.html"

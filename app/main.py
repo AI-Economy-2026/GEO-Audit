@@ -16,8 +16,8 @@ from pydantic import BaseModel
 
 import os
 
-from app.config import WORKER_API_KEY
-from app.worker import run_audit_task, run_audit_extension
+from config import WORKER_API_KEY
+from worker import run_audit_task, run_audit_extension
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
