@@ -86,6 +86,7 @@ def run_audit_task(audit_id: str) -> None:
                 prompt_id=p["prompt_id"],
                 category=p["category"],
                 prompt_text=p["prompt_text"],
+                prompt_type=p.get("prompt_type", "ranking"),
             )
             for p in prompts_resp.data
         ]
@@ -125,6 +126,7 @@ def run_audit_task(audit_id: str) -> None:
                 "prompt_id": result.prompt_id,
                 "category": result.category,
                 "prompt_text": result.prompt_text,
+                "prompt_type": next((p.prompt_type for p in prompts if p.prompt_id == result.prompt_id), "ranking"),
                 "engine": result.engine,
                 "engine_display": engine_display,
                 "brand_mentioned": result.brand_mentioned,
@@ -242,6 +244,7 @@ def run_audit_task(audit_id: str) -> None:
             client_name=params["brand_name"],
             client_url=params["brand_url"],
             template_path=TEMPLATE_PATH,
+            keywords=params.get("keywords", []),
         )
         print("Dashboard HTML", dashboard_html) 
 
@@ -351,6 +354,7 @@ def run_audit_extension(audit_id: str, prompt_ids: list[int]) -> None:
                 "prompt_id": result.prompt_id,
                 "category": result.category,
                 "prompt_text": result.prompt_text,
+                "prompt_type": next((p.prompt_type for p in new_prompts if p.prompt_id == result.prompt_id), "ranking"),
                 "engine": result.engine,
                 "engine_display": engine_display,
                 "brand_mentioned": result.brand_mentioned,
@@ -397,6 +401,18 @@ def run_audit_extension(audit_id: str, prompt_ids: list[int]) -> None:
             .execute()
         )
         all_result_rows = all_results_resp.data
+
+        # Load all prompts to map prompt_type
+        all_prompts_resp = (
+            sb.table("geo_audit_prompts")
+            .select("*")
+            .eq("audit_id", audit_id)
+            .order("prompt_id")
+            .execute()
+        )
+        prompt_types = {p["prompt_id"]: p.get("prompt_type", "ranking") for p in all_prompts_resp.data}
+        for r in all_result_rows:
+            r["prompt_type"] = prompt_types.get(r["prompt_id"], "ranking")
 
         # Convert to AuditResult objects for summary generation
         all_audit_results = [
@@ -479,6 +495,7 @@ def run_audit_extension(audit_id: str, prompt_ids: list[int]) -> None:
             client_name=params["brand_name"],
             client_url=params["brand_url"],
             template_path=TEMPLATE_PATH,
+            keywords=params.get("keywords", []),
         )
         filename = f"{audit_id}/dashboard.html"
         sb.storage.from_("geo-dashboards").upload(
@@ -520,7 +537,8 @@ def _mark_failed(sb, audit_id: str, error_message: str) -> None:
     """Mark an audit as failed with an error message."""
     sb.table("geo_audits").update({
         "status": "failed",
-        "error_message": error_message[:2000],
+        "error_message": f"System crash: {error_message[:2000]}",
         "progress_message": f"Failed: {error_message[:200]}",
+        "failed_at": datetime.now(timezone.utc).isoformat(),
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }).eq("id", audit_id).execute()

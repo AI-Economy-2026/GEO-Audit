@@ -18,6 +18,10 @@ import os
 
 from config import WORKER_API_KEY
 from worker import run_audit_task, run_audit_extension
+import sys
+import os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from engine.generate_prompts import generate_wizard_prompts
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -45,6 +49,18 @@ class AuditStartRequest(BaseModel):
 class AuditExtendRequest(BaseModel):
     audit_id: str
     prompt_ids: list[int]
+
+
+class GeneratePromptsRequest(BaseModel):
+    brand_name: str
+    brand_url: str
+    competitors: list[str] = []
+    keywords: list[str] = []
+
+
+class GeneratePromptsResponse(BaseModel):
+    intent_prompts: list[str]
+    ranking_prompts: list[str]
 
 
 class HealthResponse(BaseModel):
@@ -77,6 +93,33 @@ async def debug_env():
         "supabase_key_first10": sb_key[:10] if sb_key else "EMPTY",
         "supabase_key_last5": sb_key[-5:] if sb_key else "EMPTY",
     }
+
+
+@app.post("/api/generate-prompts", response_model=GeneratePromptsResponse)
+async def generate_prompts(
+    req: GeneratePromptsRequest,
+    authorization: str = Header(...)
+):
+    """Generate 5 intent prompts and 10 ranking prompts using LLM"""
+    api_key = os.environ.get("WORKER_API_KEY", "") or WORKER_API_KEY
+    expected = f"Bearer {api_key}"
+    if not api_key or authorization != expected:
+        raise HTTPException(status_code=401, detail="Invalid worker API key.")
+
+    try:
+        result = generate_wizard_prompts(
+            brand_name=req.brand_name,
+            brand_url=req.brand_url,
+            competitors=req.competitors,
+            keywords=req.keywords
+        )
+        return GeneratePromptsResponse(
+            intent_prompts=result.get("intent_prompts", []),
+            ranking_prompts=result.get("ranking_prompts", [])
+        )
+    except Exception as e:
+        logger.error(f"Error generating prompts endpoint: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/api/audits/start", response_model=AuditStartResponse)
