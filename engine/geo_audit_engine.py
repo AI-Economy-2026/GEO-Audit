@@ -20,6 +20,17 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Callable, Optional
+import logging
+
+# from tenacity import (
+#     retry,
+#     stop_after_attempt,
+#     wait_exponential,
+#     retry_if_exception_type,
+#     before_sleep_log
+# )
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Third-party imports (graceful degradation)
@@ -79,10 +90,18 @@ ENGINE_RATE_LIMITS = {
     "xai": 1.0,
     "deepseek": 1.0,
     "meta_llama": 1.0,
-    "google_ai_mode": 2.0,
-    "google_ai_overview": 2.0,
-    "bing_copilot": 2.0,
+    "google_ai_mode": 4.0,
+    "google_ai_overview": 4.0,
+    "bing_copilot": 4.0,
 }
+
+
+# ---------------------------------------------------------------------------
+# Exceptions
+# ---------------------------------------------------------------------------
+class SerpApiFatalError(Exception):
+    """Exception raised for non-retriable SerpApi errors (e.g., out of search credits)."""
+    pass
 
 
 # ---------------------------------------------------------------------------
@@ -93,6 +112,7 @@ class Prompt:
     prompt_id: int
     category: str
     prompt_text: str
+    prompt_type: str = "ranking"
 
 
 @dataclass
@@ -108,6 +128,8 @@ class AuditResult:
     sentiment: str = "neutral"
     response_text: str = ""
     timestamp: str = ""
+    excerpt: Optional[str] = None
+    citation_data: dict = field(default_factory=lambda: {"cited": False, "all_citations": [], "citation_position": None})
 
 
 # Type alias for the progress callback
@@ -117,7 +139,26 @@ ProgressCallback = Callable[[int, int, AuditResult], None]
 # ---------------------------------------------------------------------------
 # API query functions (all identical to CLI version)
 # ---------------------------------------------------------------------------
+
+#  = retry(
+#     retry=retry_if_exception_type(Exception),
+#     wait=wait_exponential(multiplier=1, min=2, max=60),
+#     stop=stop_after_attempt(5),
+#     before_sleep=before_sleep_log(logger, logging.WARNING),
+#     reraise=True
+# )
+
+# _serpapi = retry(
+#     retry=retry_if_exception_type(Exception) & ~retry_if_exception_type(SerpApiFatalError),
+#     wait=wait_exponential(multiplier=2, min=4, max=120),
+#     stop=stop_after_attempt(10),
+#     before_sleep=before_sleep_log(logger, logging.WARNING),
+#     reraise=True
+# )
+
+
 def query_openai(prompt_text: str) -> str:
+    print("prompt_text", prompt_text)
     if openai is None:
         raise ImportError("openai library is not installed.")
     api_key = os.getenv("OPENAI_API_KEY")
@@ -130,7 +171,9 @@ def query_openai(prompt_text: str) -> str:
         temperature=0.2,
         max_tokens=2048,
     )
+    print("response by openai", response)
     return response.choices[0].message.content or ""
+
 
 
 def query_anthropic(prompt_text: str) -> str:
@@ -145,9 +188,11 @@ def query_anthropic(prompt_text: str) -> str:
         max_tokens=2048,
         messages=[{"role": "user", "content": prompt_text}],
     )
+    print("response by anthropic", message)
     return "".join(
         block.text for block in message.content if hasattr(block, "text")
     )
+
 
 
 def query_google(prompt_text: str) -> str:
@@ -169,6 +214,7 @@ def query_google(prompt_text: str) -> str:
     return result["candidates"][0]["content"]["parts"][0]["text"]
 
 
+
 def query_perplexity(prompt_text: str) -> str:
     if openai is None:
         raise ImportError("openai library is not installed.")
@@ -182,7 +228,9 @@ def query_perplexity(prompt_text: str) -> str:
         temperature=0.2,
         max_tokens=2048,
     )
+    print("response by perplexity", response)
     return response.choices[0].message.content or ""
+
 
 
 def query_xai(prompt_text: str) -> str:
@@ -198,7 +246,9 @@ def query_xai(prompt_text: str) -> str:
         temperature=0.2,
         max_tokens=2048,
     )
+    print("response by xai", response)
     return response.choices[0].message.content or ""
+
 
 
 def query_deepseek(prompt_text: str) -> str:
@@ -214,7 +264,9 @@ def query_deepseek(prompt_text: str) -> str:
         temperature=0.2,
         max_tokens=2048,
     )
+    print("response by deepseek", response)
     return response.choices[0].message.content or ""
+
 
 
 def query_meta_llama(prompt_text: str) -> str:
@@ -230,7 +282,9 @@ def query_meta_llama(prompt_text: str) -> str:
         temperature=0.2,
         max_tokens=2048,
     )
+    print("response by query_meta_llama", response)
     return response.choices[0].message.content or ""
+
 
 
 def query_google_ai_mode(prompt_text: str) -> str:
@@ -245,10 +299,17 @@ def query_google_ai_mode(prompt_text: str) -> str:
         "q": prompt_text,
         "api_key": api_key,
     })
-    url = f"https://serpapi.com/search.json?{params}"
+    url = f"https://www.searchapi.io/api/v1/search?{params}"
     req = urllib.request.Request(url)
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        result = json.loads(resp.read().decode("utf-8"))
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            result = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        error_body = e.read().decode("utf-8")
+        logger.error(f"SearchAPI Error (Google AI Mode): {error_body}")
+        if "out of searches" in error_body.lower() or e.code in [400, 401, 403]:
+            raise SerpApiFatalError(f"SearchAPI Fatal {e.code}: {error_body}") from e
+        raise Exception(f"SearchAPI HTTP {e.code}: {error_body}") from e
     if "markdown" in result and result["markdown"]:
         return result["markdown"]
     text_blocks = result.get("text_blocks", [])
@@ -259,6 +320,7 @@ def query_google_ai_mode(prompt_text: str) -> str:
         elif isinstance(block, str):
             parts.append(block)
     return "\n".join(parts) if parts else "[NO RESPONSE] Google AI Mode returned no content."
+
 
 
 def query_google_ai_overview(prompt_text: str) -> str:
@@ -273,10 +335,17 @@ def query_google_ai_overview(prompt_text: str) -> str:
         "q": prompt_text,
         "api_key": api_key,
     })
-    url = f"https://serpapi.com/search.json?{params}"
+    url = f"https://www.searchapi.io/api/v1/search?{params}"
     req = urllib.request.Request(url)
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        result = json.loads(resp.read().decode("utf-8"))
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            result = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        error_body = e.read().decode("utf-8")
+        logger.error(f"SearchAPI Error (Google AI Overview): {error_body}")
+        if "out of searches" in error_body.lower() or e.code in [400, 401, 403]:
+            raise SerpApiFatalError(f"SearchAPI Fatal {e.code}: {error_body}") from e
+        raise Exception(f"SearchAPI HTTP {e.code}: {error_body}") from e
     ai_overview = result.get("ai_overview", {})
     if not ai_overview:
         return "[NO RESPONSE] No AI Overview was generated for this query."
@@ -294,6 +363,7 @@ def query_google_ai_overview(prompt_text: str) -> str:
     return str(ai_overview)
 
 
+
 def query_bing_copilot(prompt_text: str) -> str:
     import urllib.request
     import urllib.error
@@ -306,10 +376,17 @@ def query_bing_copilot(prompt_text: str) -> str:
         "q": prompt_text,
         "api_key": api_key,
     })
-    url = f"https://serpapi.com/search.json?{params}"
+    url = f"https://www.searchapi.io/api/v1/search?{params}"
     req = urllib.request.Request(url)
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        result = json.loads(resp.read().decode("utf-8"))
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            result = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        error_body = e.read().decode("utf-8")
+        logger.error(f"SearchAPI Error (Bing Copilot): {error_body}")
+        if "out of searches" in error_body.lower() or e.code in [400, 401, 403]:
+            raise SerpApiFatalError(f"SearchAPI Fatal {e.code}: {error_body}") from e
+        raise Exception(f"SearchAPI HTTP {e.code}: {error_body}") from e
     # Extract AI-generated content or organic snippets
     ai_overview = result.get("ai_overview", {})
     if ai_overview:
@@ -357,9 +434,152 @@ ENGINE_KEY_MAP = {
 
 
 # ---------------------------------------------------------------------------
-# Response analysis (identical to CLI version)
+# Response analysis (LLM-based)
 # ---------------------------------------------------------------------------
-def analyse_response(
+
+async def _llm_detect_brand(response_text: str, brand: str) -> dict:
+    """
+    Uses gpt-4o-mini to determine if brand is mentioned/recommended.
+    """
+    prompt = f"""Analyze this AI-generated response and determine if the 
+company "{brand}" is mentioned or recommended.
+
+Response text:
+{response_text[:3000]}
+
+Return ONLY a JSON object with no explanation, no markdown, no backticks:
+{{
+  "mentioned": true or false,
+  "recommended": true or false,
+  "position": null or integer (1 if first recommendation, 2 if second, etc),
+  "excerpt": null or the exact sentence where the brand appears
+}}
+
+Rules:
+- "mentioned" = brand appears in any context
+- "recommended" = brand is actively suggested as a good option
+- Be strict about brand matching — "{brand}" should be matched exactly. Partial matches within other words are NOT matches.
+- If brand does not appear at all, return mentioned: false, 
+  recommended: false, position: null, excerpt: null"""
+
+    try:
+        if openai is None:
+            raise ImportError("openai library is not installed.")
+        client = openai.AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        response = await client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0,
+            max_tokens=150
+        )
+        raw = response.choices[0].message.content.strip()
+        raw = raw.replace("```json", "").replace("```", "").strip()
+        return json.loads(raw)
+    except Exception as e:
+        logger.error(f"LLM brand detect failed: {e}")
+        # Fallback to basic string match if LLM call fails
+        mentioned = brand.lower() in response_text.lower()
+        return {
+            "mentioned": mentioned,
+            "recommended": mentioned,
+            "position": None,
+            "excerpt": None
+        }
+
+
+async def _llm_detect_sentiment(excerpt: str, brand: str) -> str:
+    """
+    Classifies how the brand is discussed in the given excerpt.
+    Returns one of: "Positive", "Neutral", "Negative", "Not Mentioned"
+    """
+    if not excerpt:
+        return "Not Mentioned"
+    
+    prompt = f"""How is the company "{brand}" discussed in this text?
+
+Text: {excerpt}
+
+Return ONLY one of these three words, nothing else:
+positive
+neutral  
+negative
+
+Rules:
+- positive = actively praised or recommended
+- neutral = mentioned factually without strong opinion
+- negative = criticized, warned against, portrays poorly, or explicitly not recommended"""
+
+    try:
+        client = openai.AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        response = await client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0,
+            max_tokens=10
+        )
+        result = response.choices[0].message.content.strip().lower()
+        if result in ["positive", "neutral", "negative"]:
+            return result
+        return "neutral"
+    except Exception as e:
+        logger.error(f"LLM sentiment detect failed: {e}")
+        return "neutral"  # Safe fallback
+
+def parse_citations(response_text: str, target_url: str) -> dict:
+    """
+    Extracts all citations from LLM response and checks if target_url
+    is cited.
+    """
+    import re
+    
+    all_urls = []
+    
+    # Format 1: [Text](URL)
+    inline_links = re.findall(r'\[([^\]]+)\]\((https?://[^\)]+)\)', 
+                              response_text)
+    all_urls.extend([url for _, url in inline_links])
+    
+    # Format 2 & 3: [1]: URL or [^1]: URL
+    ref_links = re.findall(r'\[\^?\d+\]:\s*(https?://\S+)', response_text)
+    all_urls.extend(ref_links)
+    
+    # Format 4: bare URLs
+    bare_urls = re.findall(r'(?<!\()(https?://[^\s\)\]\,]+)', response_text)
+    all_urls.extend(bare_urls)
+    
+    # Format 5: numbered list references
+    numbered_refs = re.findall(r'^\d+\.\s+(https?://\S+)', 
+                               response_text, re.MULTILINE)
+    all_urls.extend(numbered_refs)
+    
+    # Deduplicate
+    all_urls = list(set(all_urls))
+    
+    # Check if target URL is in citations
+    target_domain = target_url.lower().replace('https://', '')\
+                                      .replace('http://', '')\
+                                      .replace('www.', '')\
+                                      .split('/')[0]
+    
+    cited = False
+    citation_position = None
+    
+    for i, url in enumerate(all_urls):
+        url_clean = url.lower().replace('https://', '')\
+                               .replace('http://', '')\
+                               .replace('www.', '')
+        if target_domain in url_clean or url_clean.startswith(target_domain):
+            cited = True
+            citation_position = i + 1
+            break
+    
+    return {
+        "cited": cited,
+        "all_citations": all_urls,
+        "citation_position": citation_position
+    }
+
+async def analyse_response(
     response_text: str,
     brand: str,
     url: str,
@@ -367,23 +587,34 @@ def analyse_response(
 ) -> dict:
     text_lower = response_text.lower()
     brand_lower = brand.lower()
-    brand_mentioned = brand_lower in text_lower
-    url_normalised = url.lower().replace("https://", "").replace("http://", "").replace("www.", "")
-    url_cited = url_normalised in text_lower
-    position_rank = _detect_list_position(response_text, brand)
+    
+    # Use LLM logic for brand detection
+    brand_data = await _llm_detect_brand(response_text, brand)
+    brand_mentioned = brand_data["mentioned"]
+    
+    # Citation footnote parser
+    citation_data = parse_citations(response_text, url)
+    url_cited = citation_data["cited"]
+    
+    position_rank = brand_data.get("position") or _detect_list_position(response_text, brand)
+    
     competitor_mentions = [
         comp for comp in competitors
         if comp.strip() and comp.strip().lower() in text_lower
     ]
-    sentiment = _detect_sentiment(response_text, brand)
+    
+    # Use LLM logic for sentiment detection
+    sentiment = await _llm_detect_sentiment(brand_data.get("excerpt") or response_text, brand)
+    
     return {
         "brand_mentioned": brand_mentioned,
         "position_rank": position_rank,
         "url_cited": url_cited,
         "competitor_mentions": competitor_mentions,
         "sentiment": sentiment,
+        "excerpt": brand_data.get("excerpt"),
+        "citation_data": citation_data,
     }
-
 
 def _detect_list_position(response_text: str, brand: str) -> Optional[int]:
     brand_lower = brand.lower()
@@ -397,39 +628,6 @@ def _detect_list_position(response_text: str, brand: str) -> Optional[int]:
         if brand_lower in item_text:
             return rank
     return None
-
-
-def _detect_sentiment(response_text: str, brand: str) -> str:
-    brand_lower = brand.lower()
-    text_lower = response_text.lower()
-    if brand_lower not in text_lower:
-        return "neutral"
-    sentences = re.split(r"[.!?\n]", response_text)
-    brand_sentences = [s for s in sentences if brand_lower in s.lower()]
-    if not brand_sentences:
-        return "neutral"
-    positive_words = {
-        "leading", "top", "best", "excellent", "strong", "trusted",
-        "reputable", "reliable", "innovative", "award", "recommended",
-        "established", "comprehensive", "outstanding", "premier",
-        "well-known", "renowned", "respected", "experienced", "expertise",
-        "specialise", "specialize", "certified", "accredited",
-        "high-quality", "proven", "robust", "partner",
-    }
-    negative_words = {
-        "poor", "weak", "lacks", "limited", "outdated", "expensive",
-        "complaints", "issues", "problems", "concerns", "behind",
-        "struggling", "declining", "negative", "worst", "avoid",
-        "disappointing", "inferior", "unreliable",
-    }
-    combined = " ".join(brand_sentences).lower()
-    pos_count = sum(1 for w in positive_words if w in combined)
-    neg_count = sum(1 for w in negative_words if w in combined)
-    if pos_count > neg_count:
-        return "positive"
-    elif neg_count > pos_count:
-        return "negative"
-    return "neutral"
 
 
 # ---------------------------------------------------------------------------
@@ -481,25 +679,47 @@ def run_audit(
 
             for attempt in range(1, MAX_RETRIES + 2):
                 try:
-                    response_text = query_fn(prompt.prompt_text)
+                    raw_response = query_fn(prompt.prompt_text)
                     success = True
                     break
                 except Exception as exc:
                     if attempt <= MAX_RETRIES:
                         time.sleep(RATE_LIMIT_SECONDS)
                     else:
-                        response_text = f"[ERROR] {exc.__class__.__name__}: {exc}"
+                        raw_response = f"[ERROR] {exc.__class__.__name__}: {exc}"
 
             if success:
-                analysis = analyse_response(response_text, brand, url, competitors)
-                result.brand_mentioned = analysis["brand_mentioned"]
-                result.position_rank = analysis["position_rank"]
-                result.url_cited = analysis["url_cited"]
-                result.competitor_mentions = analysis["competitor_mentions"]
-                result.sentiment = analysis["sentiment"]
-                result.response_text = response_text
+                if isinstance(raw_response, dict):
+                    response_text = raw_response.get("response_text", "")
+                    result.scraper_status = raw_response.get("scraper_status", "success")
+                    result.scraper_error = raw_response.get("scraper_error")
+                else:
+                    response_text = raw_response
+                    result.scraper_status = "success"
+
+                if result.scraper_status == "failed":
+                    result.brand_mentioned = False
+                    result.position_rank = None
+                    result.url_cited = False
+                    result.sentiment = "neutral"
+                    result.response_text = response_text
+                else:
+                    # Wrap with asyncio.run since run_audit is a sync function
+                    loop = asyncio.new_event_loop()
+                    analysis = loop.run_until_complete(analyse_response(response_text, brand, url, competitors))
+                    loop.close()
+                    result.brand_mentioned = analysis["brand_mentioned"]
+                    result.position_rank = analysis["position_rank"]
+                    result.url_cited = analysis["url_cited"]
+                    result.competitor_mentions = analysis["competitor_mentions"]
+                    result.sentiment = analysis["sentiment"]
+                    result.response_text = response_text
+                    result.excerpt = analysis.get("excerpt")
+                    result.citation_data = analysis.get("citation_data", {})
             else:
-                result.response_text = response_text
+                result.response_text = str(raw_response)
+                result.scraper_status = "failed"
+                result.scraper_error = "Query failed"
 
             results.append(result)
 
@@ -628,7 +848,7 @@ async def _run_engine_prompts(
 
         for attempt in range(1, MAX_RETRIES + 2):
             try:
-                response_text = await loop.run_in_executor(
+                raw_response = await loop.run_in_executor(
                     executor, query_fn, prompt.prompt_text
                 )
                 success = True
@@ -637,18 +857,37 @@ async def _run_engine_prompts(
                 if attempt <= MAX_RETRIES:
                     await asyncio.sleep(rate_limit)
                 else:
-                    response_text = f"[ERROR] {exc.__class__.__name__}: {exc}"
+                    raw_response = f"[ERROR] {exc.__class__.__name__}: {exc}"
 
         if success:
-            analysis = analyse_response(response_text, brand, url, competitors)
-            result.brand_mentioned = analysis["brand_mentioned"]
-            result.position_rank = analysis["position_rank"]
-            result.url_cited = analysis["url_cited"]
-            result.competitor_mentions = analysis["competitor_mentions"]
-            result.sentiment = analysis["sentiment"]
-            result.response_text = response_text
+            if isinstance(raw_response, dict):
+                response_text = raw_response.get("response_text", "")
+                result.scraper_status = raw_response.get("scraper_status", "success")
+                result.scraper_error = raw_response.get("scraper_error")
+            else:
+                response_text = raw_response
+                result.scraper_status = "success"
+
+            if result.scraper_status == "failed":
+                result.brand_mentioned = False
+                result.position_rank = None
+                result.url_cited = False
+                result.sentiment = "neutral"
+                result.response_text = response_text
+            else:
+                analysis = await analyse_response(response_text, brand, url, competitors)
+                result.brand_mentioned = analysis["brand_mentioned"]
+                result.position_rank = analysis["position_rank"]
+                result.url_cited = analysis["url_cited"]
+                result.competitor_mentions = analysis["competitor_mentions"]
+                result.sentiment = analysis["sentiment"]
+                result.response_text = response_text
+                result.excerpt = analysis.get("excerpt")
+                result.citation_data = analysis.get("citation_data", {})
         else:
-            result.response_text = response_text
+            result.response_text = str(raw_response)
+            result.scraper_status = "failed"
+            result.scraper_error = "Query failed"
 
         results.append(result)
 
@@ -685,7 +924,7 @@ async def run_audit_async(
     progress_counter = [0]
 
     executor = ThreadPoolExecutor(max_workers=len(engines))
-
+    
     try:
         tasks = [
             _run_engine_prompts(

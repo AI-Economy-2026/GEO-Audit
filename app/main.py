@@ -15,12 +15,12 @@ from fastapi import BackgroundTasks, FastAPI, Header, HTTPException
 from pydantic import BaseModel
 
 import os
-
-from config import WORKER_API_KEY
-from worker import run_audit_task, run_audit_extension
 import sys
-import os
+
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+from .config import WORKER_API_KEY
+from .worker import run_audit_task, run_audit_extension
 from engine.generate_prompts import generate_wizard_prompts
 
 logging.basicConfig(level=logging.INFO)

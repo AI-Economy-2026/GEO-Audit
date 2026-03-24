@@ -22,7 +22,7 @@ _PROJECT_ROOT = str(Path(__file__).resolve().parent.parent)
 if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
-from supabase_client import get_supabase
+from .supabase_client import get_supabase
 from engine.geo_audit_engine import (
     AuditResult,
     ENGINE_DISPLAY_NAMES,

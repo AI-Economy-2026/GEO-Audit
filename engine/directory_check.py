@@ -71,7 +71,7 @@ def check_directories(brand: str) -> list[dict]:
                 "api_key": api_key,
                 "num": 3,
             })
-            url = f"https://serpapi.com/search.json?{params}"
+            url = f"https://www.searchapi.io/api/v1/search?{params}"
             req = urllib.request.Request(url)
             with urllib.request.urlopen(req, timeout=15) as resp:
                 data = json.loads(resp.read().decode("utf-8"))

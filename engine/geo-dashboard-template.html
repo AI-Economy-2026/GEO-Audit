@@ -124,6 +124,19 @@ h3 {
   opacity: 0.8;
 }
 
+/* Keywords Pill */
+.keyword-pill {
+  display: inline-block;
+  background: #f0f0f0;
+  color: #333;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 16px;
+  letter-spacing: 1px;
+  border: 1px solid #ddd;
+}
+
 /* ============================================================
    SECTION 4: RANKINGS TABLES
    ============================================================ */
@@ -645,6 +658,16 @@ h3 {
 </div>
 
 <!-- ============================================================
+     SECTION 2.5: KEYWORDS
+     ============================================================ -->
+<div class="keywords-section" style="margin: 40px 0;">
+  <h3>Target Keywords</h3>
+  <div id="keywordsContainer" style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 20px;">
+    <!-- Populated by JavaScript -->
+  </div>
+</div>
+
+<!-- ============================================================
      SECTION 3: PERFORMANCE OVERVIEW (KPIs)
      ============================================================ -->
 <h2>Performance Overview</h2>
@@ -658,6 +681,16 @@ h3 {
     <div class="kpi-label">Visibility Rate</div>
     <div class="kpi-value">{{VISIBILITY_RATE}}%</div>
     <div class="kpi-subtitle">{{TOTAL_MENTIONED}} of {{TOTAL_QUERIES}} queries</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">Intent Visibility</div>
+    <div class="kpi-value">{{INTENT_VISIBILITY_RATE}}%</div>
+    <div class="kpi-subtitle">On {{INTENT_PROMPT_COUNT}} intent prompts</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">Ranking Visibility</div>
+    <div class="kpi-value">{{RANKING_VISIBILITY_RATE}}%</div>
+    <div class="kpi-subtitle">On {{RANKING_PROMPT_COUNT}} ranking prompts</div>
   </div>
   <div class="kpi-card">
     <div class="kpi-label">AI Engines Tested</div>
@@ -809,6 +842,16 @@ var PROMPT_DATA = {{PROMPT_DATA}};
 var CATEGORY_RANKINGS = {{CATEGORY_RANKINGS}};
 var CATEGORY_PERF = {{CATEGORY_PERF}};
 var CLIENT_NAME = "{{CLIENT_NAME}}";
+var KEYWORDS = {{KEYWORDS_JSON}};
+
+// Render Keywords
+(function renderKeywords() {
+  var container = document.getElementById('keywordsContainer');
+  if (!container || !KEYWORDS || !KEYWORDS.length) return;
+  KEYWORDS.forEach(function(kw) {
+    container.innerHTML += '<span class="keyword-pill">' + kw + '</span>';
+  });
+})();
 
 // ============================================================
 // SECTION 4: Rankings by Category
@@ -949,6 +992,21 @@ var filteredPrompts = PROMPT_DATA.slice();
   mentionedBtn.onclick = function() { filterByCategory('mentioned'); };
   tabContainer.appendChild(mentionedBtn);
 
+  // Intent & Ranking tabs
+  var intentBtn = document.createElement('button');
+  intentBtn.className = 'tab-btn';
+  intentBtn.setAttribute('data-cat', 'intent');
+  intentBtn.textContent = 'Intent Prompts';
+  intentBtn.onclick = function() { filterByCategory('intent'); };
+  tabContainer.appendChild(intentBtn);
+
+  var rankingBtn = document.createElement('button');
+  rankingBtn.className = 'tab-btn';
+  rankingBtn.setAttribute('data-cat', 'ranking');
+  rankingBtn.textContent = 'Ranking Prompts';
+  rankingBtn.onclick = function() { filterByCategory('ranking'); };
+  tabContainer.appendChild(rankingBtn);
+
   // All tab click handler
   tabContainer.querySelector('[data-cat="all"]').onclick = function() { filterByCategory('all'); };
 })();
@@ -961,8 +1019,12 @@ function filterByCategory(cat) {
     filteredPrompts = PROMPT_DATA.slice();
   } else if (cat === 'mentioned') {
     filteredPrompts = PROMPT_DATA.filter(function(p) {
-      return Object.values(p.engines).some(function(e) { return e.mentioned; });
+      return Object.values(p.engines).some(function(e) { return e.mentioned && e.status !== 'failed'; });
     });
+  } else if (cat === 'intent') {
+    filteredPrompts = PROMPT_DATA.filter(function(p) { return p.type === 'INTENT'; });
+  } else if (cat === 'ranking') {
+    filteredPrompts = PROMPT_DATA.filter(function(p) { return p.type === 'RANKING'; });
   } else {
     filteredPrompts = PROMPT_DATA.filter(function(p) { return p.category === cat; });
   }
@@ -996,6 +1058,7 @@ function renderPrompts() {
     var header = '<div class="prompt-header">';
     header += '<div class="prompt-left">';
     header += '<span class="prompt-number">' + String(p.id).padStart(2, '0') + '</span>';
+    header += '<span class="status-badge" style="background:#e0e0e0; color:#333; font-size:10px;">' + (p.type || 'RANKING') + '</span>';
     header += '<span class="prompt-text">' + p.prompt + '</span>';
     header += '</div>';
     header += '<div class="prompt-right">';
@@ -1012,15 +1075,17 @@ function renderPrompts() {
     header += '<span class="expand-arrow">&#9660;</span>';
     header += '</div></div>';
 
-    // Engine details grid
     var grid = '<div class="engines-grid">';
     engineNames.forEach(function(eName) {
       var eData = engines[eName];
-      var itemClass = eData.mentioned ? 'engine-item has-mention' : 'engine-item';
+      var itemClass = eData.mentioned && eData.status !== 'failed' ? 'engine-item has-mention' : 'engine-item';
       grid += '<div class="' + itemClass + '" ' +
-        (eData.mentioned ? 'onclick="showMention(\'' + eName.replace(/'/g, "\\'") + '\', ' + JSON.stringify(p.prompt).replace(/"/g, '&quot;') + ', ' + JSON.stringify(eData.excerpt || '').replace(/"/g, '&quot;') + ')"' : '') + '>';
+        (eData.mentioned && eData.status !== 'failed' ? 'onclick="showMention(\'' + eName.replace(/'/g, "\\'") + '\', ' + JSON.stringify(p.prompt).replace(/"/g, '&quot;') + ', ' + JSON.stringify(eData.excerpt || '').replace(/"/g, '&quot;') + ')"' : '') + '>';
       grid += '<span class="engine-name">' + eName + '</span>';
-      if (eData.mentioned) {
+      
+      if (eData.status === 'failed') {
+        grid += '<span style="color:#999; font-size:11px; font-weight:bold;">&mdash; Data unavailable</span>';
+      } else if (eData.mentioned) {
         grid += '<span class="mention-check">&#10003; MENTIONED</span>';
       } else {
         grid += '<span class="mention-miss">&#10007; Not mentioned</span>';

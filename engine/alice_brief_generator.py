@@ -20,6 +20,43 @@ CONTENT_TYPES = [
 ]
 
 
+def _build_alice_context(results: list[dict], brand: str, competitors: list[str]) -> list[dict]:
+    context = []
+    
+    # Group results by engine
+    engines = {r["engine"] for r in results}
+    for engine in engines:
+        engine_rows = [r for r in results if r["engine"] == engine]
+        
+        # Calculate visibility for this engine
+        mentioned = sum(1 for r in engine_rows if r["brand_mentioned"])
+        engine_visibility = round(mentioned / len(engine_rows) * 100) if engine_rows else 0
+        
+        # Count sentiment
+        sentiments = {"positive": 0, "neutral": 0, "negative": 0}
+        for r in engine_rows:
+            if r["brand_mentioned"]:
+                sentiments[r.get("sentiment", "neutral").lower()] += 1
+                
+        # Top mentioned competitors in this engine
+        comp_counts = {}
+        for r in engine_rows:
+            for comp in r.get("competitor_mentions", []):
+                comp_counts[comp] = comp_counts.get(comp, 0) + 1
+        top_comps = sorted(comp_counts.items(), key=lambda k: k[1], reverse=True)[:3]
+        
+        engine_data = {
+            "engine": engine,
+            "queries_run": len(engine_rows),
+            "visibility_rate_percent": engine_visibility,
+            "sentiment_breakdown": sentiments,
+            "top_competitors_mentioned": top_comps,
+            "failed_queries": sum(1 for r in engine_rows if r.get("scraper_status") in ("failed", "no_overview", "error"))
+        }
+        context.append(engine_data)
+        
+    return context
+
 def generate_alice_brief(
     results: list[dict],
     keyword_gaps: dict,
@@ -206,7 +243,10 @@ def generate_alice_brief(
         "both_weak_count": serp_data.get("summary", {}).get("both_weak", 0),
     }
 
+    summarized_results = _build_alice_context(results, brand, competitors)
+
     return {
+        "engine_visibility_data": summarized_results,
         "content_recommendations": content_recommendations[:20],  # Top 20
         "directory_actions": directory_actions,
         "keyword_opportunities": serp_vs_ai_gaps,

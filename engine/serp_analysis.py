@@ -37,7 +37,7 @@ def check_site_index(domain: str) -> dict:
             "api_key": api_key,
             "num": 10,
         })
-        url = f"https://serpapi.com/search.json?{params}"
+        url = f"https://www.searchapi.io/api/v1/search?{params}"
         req = urllib.request.Request(url)
         with urllib.request.urlopen(req, timeout=15) as resp:
             data = json.loads(resp.read().decode("utf-8"))
@@ -103,7 +103,7 @@ def check_organic_rankings(
                 "api_key": api_key,
                 "num": 10,
             })
-            url = f"https://serpapi.com/search.json?{params}"
+            url = f"https://www.searchapi.io/api/v1/search?{params}"
             req = urllib.request.Request(url)
             with urllib.request.urlopen(req, timeout=15) as resp:
                 data = json.loads(resp.read().decode("utf-8"))

@@ -109,6 +109,9 @@ def _prepare_rows(rows: list[dict]) -> list[dict]:
         engine_raw = r.get("engine", "").strip()
         r["engine_display"] = normalise_engine_name(engine_raw)
 
+        # Pass through prompt type
+        r["prompt_type"] = r.get("prompt_type", "ranking")
+
         prepared.append(r)
 
     return prepared
@@ -118,10 +121,11 @@ def _prepare_rows(rows: list[dict]) -> list[dict]:
 # AuditAnalysis (identical to CLI version)
 # ---------------------------------------------------------------------------
 class AuditAnalysis:
-    def __init__(self, rows: list[dict], client_name: str, client_url: str):
+    def __init__(self, rows: list[dict], client_name: str, client_url: str, keywords: list[str] = None):
         self.rows = rows
         self.client_name = client_name
         self.client_url = client_url
+        self.keywords = keywords or []
         self.valid_rows = [
             r for r in rows
             if not r.get("response_text", "").startswith("[ERROR]")
@@ -140,9 +144,23 @@ class AuditAnalysis:
         self._calc_per_category()
         self._calc_competitors()
         self._calc_per_prompt()
+        self._calc_split_visibility()
         self._calc_category_rankings()
         self._generate_findings()
         self._generate_recommendations()
+
+    def _calc_split_visibility(self):
+        intent_rows = [r for r in self.valid_rows if r.get("prompt_type") == "intent" and r.get("scraper_status", "success") != "failed"]
+        ranking_rows = [r for r in self.valid_rows if r.get("prompt_type") == "ranking" and r.get("scraper_status", "success") != "failed"]
+
+        intent_mentioned = sum(1 for r in intent_rows if r.get("brand_mentioned"))
+        ranking_mentioned = sum(1 for r in ranking_rows if r.get("brand_mentioned"))
+
+        self.intent_vis = round((intent_mentioned / len(intent_rows)) * 100) if intent_rows else 0
+        self.ranking_vis = round((ranking_mentioned / len(ranking_rows)) * 100) if ranking_rows else 0
+
+        self.intent_prompt_count = len(set(r.get("prompt_id") for r in intent_rows))
+        self.ranking_prompt_count = len(set(r.get("prompt_id") for r in ranking_rows))
 
     def _calc_overall(self):
         total = len(self.valid_rows)
@@ -219,13 +237,32 @@ class AuditAnalysis:
 
     def _calc_per_prompt(self):
         prompt_map: dict[int, dict] = {}
-        for r in self.valid_rows:
+        # Iterate over all rows to include failed queries in the prompt table
+        for r in self.rows:
             pid = int(r["prompt_id"])
             if pid not in prompt_map:
-                prompt_map[pid] = {"id": pid, "prompt": r["prompt_text"], "category": r["category"], "engines": {}}
+                prompt_map[pid] = {
+                    "id": pid, 
+                    "prompt": r["prompt_text"], 
+                    "category": r["category"], 
+                    "type": r.get("prompt_type", "ranking").upper(),
+                    "engines": {}
+                }
             engine = r["engine_display"]
-            excerpt = self._make_excerpt(r.get("response_text", ""), 500)
-            prompt_map[pid]["engines"][engine] = {"mentioned": r["brand_mentioned"], "excerpt": excerpt}
+            
+            status = r.get("scraper_status", "success")
+            if status == "failed":
+                mentioned = False
+                excerpt = "Data unavailable"
+            else:
+                mentioned = r.get("brand_mentioned", False)
+                excerpt = self._make_excerpt(r.get("response_text", ""), 500)
+                
+            prompt_map[pid]["engines"][engine] = {
+                "mentioned": mentioned, 
+                "excerpt": excerpt,
+                "status": status
+            }
         self.prompt_data = [prompt_map[pid] for pid in sorted(prompt_map.keys())]
 
     def _make_excerpt(self, text: str, max_len: int = 200) -> str:
@@ -365,7 +402,8 @@ def _build_competitor_data(analysis: AuditAnalysis) -> list[dict]:
 
 
 def _build_replacements(analysis: AuditAnalysis) -> dict[str, str]:
-    today = datetime.now().strftime("%-d %B %Y")
+    now = datetime.now()
+    today = f"{now.day} {now.strftime('%B %Y')}"
     r: dict[str, str] = {}
     r["CLIENT_NAME"] = analysis.client_name
     r["CLIENT_URL"] = analysis.client_url
@@ -379,6 +417,10 @@ def _build_replacements(analysis: AuditAnalysis) -> dict[str, str]:
     r["TOTAL_QUERIES"] = str(analysis.total_queries)
     r["TOTAL_MENTIONED"] = str(analysis.total_mentioned)
     r["VISIBILITY_RATE"] = str(analysis.visibility_rate)
+    r["INTENT_VISIBILITY_RATE"] = str(analysis.intent_vis)
+    r["RANKING_VISIBILITY_RATE"] = str(analysis.ranking_vis)
+    r["INTENT_PROMPT_COUNT"] = str(analysis.intent_prompt_count)
+    r["RANKING_PROMPT_COUNT"] = str(analysis.ranking_prompt_count)
     r["ENGINE_COUNT"] = str(analysis.engine_count)
     r["BEST_RANK"] = str(analysis.best_rank) if analysis.best_rank else "-"
     r["CATEGORIES"] = f"{analysis.category_count} categories"
@@ -414,6 +456,7 @@ def _build_replacements(analysis: AuditAnalysis) -> dict[str, str]:
         r[f"REC_LEVERAGE_{i}"] = rec
     for i in range(len(analysis.rec_leverage) + 1, 4):
         r[f"REC_LEVERAGE_{i}"] = "Further analysis needed."
+    r["KEYWORDS_JSON"] = json.dumps(analysis.keywords)
     return r
 
 
@@ -426,6 +469,7 @@ def render_dashboard_html(
         html = fh.read()
 
     replacements = _build_replacements(analysis)
+    print("Replacement", replacements)
     for key, value in replacements.items():
         html = html.replace("{{" + key + "}}", str(value))
 
@@ -448,7 +492,7 @@ def render_dashboard_html(
     html = html.replace("{{COMPETITOR_DATA}}", competitor_json)
     html = html.replace("{{CATEGORY_RANKINGS}}", cat_rankings_json)
     html = html.replace("{{CATEGORY_PERF}}", cat_perf_json)
-
+    print("RETURNING HTML FROM GENERATE DASHBOARD", html)
     return html
 
 
@@ -460,6 +504,7 @@ def render_dashboard_from_data(
     client_name: str,
     client_url: str,
     template_path: str,
+    keywords: list[str] = None,
 ) -> str:
     """
     Generate a complete HTML dashboard from in-memory row data.
@@ -469,10 +514,11 @@ def render_dashboard_from_data(
         client_name: Brand name
         client_url: Brand URL
         template_path: Path to geo-dashboard-template.html
+        keywords: List of target keywords if any
 
     Returns:
         Complete HTML string of the dashboard
     """
     prepared = _prepare_rows(rows)
-    analysis = AuditAnalysis(prepared, client_name, client_url)
+    analysis = AuditAnalysis(prepared, client_name, client_url, keywords)
     return render_dashboard_html(analysis, template_path)
