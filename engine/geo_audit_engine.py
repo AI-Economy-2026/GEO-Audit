@@ -113,6 +113,7 @@ class Prompt:
     category: str
     prompt_text: str
     prompt_type: str = "ranking"
+    intent_type: str = "informational"
 
 
 @dataclass

@@ -30,6 +30,7 @@ from engine.geo_audit_engine import (
     generate_summary_dict,
     run_audit_async,
 )
+from engine.prompt_classifier import classify_prompt_type, classify_intent_type
 from engine.generate_dashboard import render_dashboard_from_data
 from engine.keyword_gap_analysis import analyse_keyword_gaps
 from engine.directory_check import check_directories
@@ -86,7 +87,8 @@ def run_audit_task(audit_id: str) -> None:
                 prompt_id=p["prompt_id"],
                 category=p["category"],
                 prompt_text=p["prompt_text"],
-                prompt_type=p.get("prompt_type", "ranking"),
+                prompt_type=classify_prompt_type(p["prompt_text"]),
+                intent_type=classify_intent_type(p["prompt_text"]),
             )
             for p in prompts_resp.data
         ]
@@ -121,12 +123,14 @@ def run_audit_task(audit_id: str) -> None:
             engine_display = ENGINE_DISPLAY_NAMES.get(result.engine, result.engine)
 
             # Insert individual result row
+            matched_prompt = next((p for p in prompts if p.prompt_id == result.prompt_id), None)
             row_data = {
                 "audit_id": audit_id,
                 "prompt_id": result.prompt_id,
                 "category": result.category,
                 "prompt_text": result.prompt_text,
-                "prompt_type": next((p.prompt_type for p in prompts if p.prompt_id == result.prompt_id), "ranking"),
+                "prompt_type": matched_prompt.prompt_type if matched_prompt else classify_prompt_type(result.prompt_text),
+                "intent_type": matched_prompt.intent_type if matched_prompt else classify_intent_type(result.prompt_text),
                 "engine": result.engine,
                 "engine_display": engine_display,
                 "brand_mentioned": result.brand_mentioned,
@@ -329,6 +333,8 @@ def run_audit_extension(audit_id: str, prompt_ids: list[int]) -> None:
                 prompt_id=p["prompt_id"],
                 category=p["category"],
                 prompt_text=p["prompt_text"],
+                prompt_type=classify_prompt_type(p["prompt_text"]),
+                intent_type=classify_intent_type(p["prompt_text"]),
             )
             for p in prompts_resp.data
         ]
@@ -349,12 +355,14 @@ def run_audit_extension(audit_id: str, prompt_ids: list[int]) -> None:
         def on_progress(completed: int, total_count: int, result: AuditResult) -> None:
             engine_display = ENGINE_DISPLAY_NAMES.get(result.engine, result.engine)
 
+            matched_prompt = next((p for p in new_prompts if p.prompt_id == result.prompt_id), None)
             row_data = {
                 "audit_id": audit_id,
                 "prompt_id": result.prompt_id,
                 "category": result.category,
                 "prompt_text": result.prompt_text,
-                "prompt_type": next((p.prompt_type for p in new_prompts if p.prompt_id == result.prompt_id), "ranking"),
+                "prompt_type": matched_prompt.prompt_type if matched_prompt else classify_prompt_type(result.prompt_text),
+                "intent_type": matched_prompt.intent_type if matched_prompt else classify_intent_type(result.prompt_text),
                 "engine": result.engine,
                 "engine_display": engine_display,
                 "brand_mentioned": result.brand_mentioned,
