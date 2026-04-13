@@ -3,93 +3,116 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>GEO Audit — {{CLIENT_NAME}} | BALMER AGENCY</title>
-<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" rel="stylesheet">
+<title>GEO Audit — {{CLIENT_NAME}} | AI Economy</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700;9..40,800;9..40,900&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
 /* ============================================================
-   GEO AUDIT DASHBOARD — BALMER AGENCY
-   Mirvac-matching light theme — self-contained
+   GEO AUDIT DASHBOARD — AI ECONOMY DESIGN SYSTEM
+   Light blue + white cards | #004AAD / #E8890C / #0F172A
    ============================================================ */
+:root{--blue:#004AAD;--blue-light:#E6F1FB;--teal:#0BA5C9;--teal-light:#E0F5FA;--dark:#0F172A;--g700:#334155;--g500:#64748B;--g400:#94A3B8;--g300:#CBD5E1;--g200:#E2E8F0;--g100:#F1F5F9;--g50:#F8FAFC;--white:#fff;--green:#1D9E75;--green-l:#E1F5EE;--orange:#E8890C;--orange-l:#FFF3E0;--red:#DC2626;--red-l:#FEF2F2}
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: 'Poppins', sans-serif;
   line-height: 1.6;
-  color: #333;
-  background: #fff;
+  color: var(--dark);
+  background: var(--g100);
+  font-size: 15px;
+  -webkit-font-smoothing: antialiased;
 }
 
 .container {
-  max-width: 1400px;
+  max-width: 1080px;
   margin: 0 auto;
-  padding: 40px 20px;
+  padding: 28px 24px;
 }
 
 /* ============================================================
-   SECTION 1: HEADER
+   NAV / HEADER
    ============================================================ */
 .header {
-  background: #000;
-  color: #fff;
-  padding: 40px 20px;
-  margin: -40px -20px 50px -20px;
-  text-align: center;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: rgba(255,255,255,0.95);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--g200);
+  padding: 12px 24px;
+  margin: -28px -24px 32px -24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 .logo-text {
-  font-family: 'Bebas Neue', sans-serif;
-  font-size: 32px;
-  letter-spacing: 3px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--dark);
 }
+.logo-text em { font-style: normal; color: var(--blue); }
 .client-logo {
-  font-family: 'Bebas Neue', sans-serif;
-  font-size: 56px;
-  letter-spacing: 4px;
-  margin: 20px 0;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--dark);
+  text-align: right;
 }
 .report-date {
-  font-size: 14px;
-  color: #ccc;
-  margin-top: 5px;
+  font-size: 12px;
+  color: var(--g400);
+  margin-top: 2px;
+  text-align: right;
 }
 
 /* ============================================================
    HEADINGS
    ============================================================ */
 h2 {
-  font-family: 'Bebas Neue', sans-serif;
-  font-size: 32px;
-  letter-spacing: 2px;
-  margin: 40px 0 20px 0;
-  border-bottom: 2px solid #000;
-  padding-bottom: 10px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin: 32px 0 16px 0;
+  color: var(--dark);
 }
 h3 {
-  font-family: 'Bebas Neue', sans-serif;
-  font-size: 24px;
-  letter-spacing: 1px;
-  margin-top: 30px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin-top: 24px;
+  color: var(--dark);
 }
 
 /* ============================================================
    SECTION 2: EXECUTIVE SUMMARY
    ============================================================ */
 .exec-summary {
-  background: #f9f9f9;
-  padding: 40px;
-  margin: 40px 0;
-  border-left: 5px solid #000;
+  background: var(--white);
+  border: 1px solid var(--g200);
+  border-left: 4px solid var(--blue);
+  border-radius: 16px;
+  padding: 28px;
+  margin: 0 0 28px 0;
 }
 .exec-summary p {
-  font-size: 16px;
+  font-size: 14px;
   line-height: 1.8;
-  margin-bottom: 15px;
+  color: var(--g700);
+  margin-bottom: 10px;
 }
+.exec-summary p:last-child { margin-bottom: 0; }
 .highlight-stat {
   display: inline-block;
-  background: #000;
-  color: #fff;
-  padding: 3px 8px;
-  font-weight: bold;
+  background: var(--orange-l);
+  color: var(--orange);
+  padding: 2px 8px;
+  border-radius: 100px;
+  font-weight: 700;
+  font-size: 13px;
 }
 
 /* ============================================================
@@ -97,44 +120,55 @@ h3 {
    ============================================================ */
 .kpi-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 20px;
-  margin: 40px 0;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 16px;
+  margin: 0 0 28px 0;
 }
 .kpi-card {
-  background: #000;
-  color: #fff;
-  padding: 30px;
+  background: var(--white);
+  border: 1px solid var(--g200);
+  border-top: 4px solid var(--blue);
+  border-radius: 16px;
+  padding: 20px;
   text-align: center;
 }
+.kpi-card:nth-child(2) { border-top-color: var(--orange); }
+.kpi-card:nth-child(3) { border-top-color: var(--green); }
+.kpi-card:nth-child(4) { border-top-color: var(--teal); }
+.kpi-card:nth-child(5) { border-top-color: var(--blue); }
+.kpi-card:nth-child(6) { border-top-color: var(--orange); }
 .kpi-label {
-  font-size: 12px;
-  letter-spacing: 2px;
+  font-size: 11px;
+  font-weight: 600;
   text-transform: uppercase;
-  margin-bottom: 15px;
+  letter-spacing: 0.06em;
+  color: var(--g500);
+  margin-bottom: 8px;
 }
 .kpi-value {
-  font-family: 'Bebas Neue', sans-serif;
-  font-size: 48px;
-  letter-spacing: 2px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 36px;
+  font-weight: 900;
+  color: var(--dark);
+  line-height: 1;
 }
 .kpi-subtitle {
-  font-size: 12px;
-  margin-top: 10px;
-  opacity: 0.8;
+  font-size: 11px;
+  color: var(--g400);
+  margin-top: 6px;
 }
 
 /* Keywords Pill */
 .keyword-pill {
   display: inline-block;
-  background: #f0f0f0;
-  color: #333;
-  padding: 8px 16px;
-  border-radius: 20px;
-  font-family: 'Bebas Neue', sans-serif;
-  font-size: 16px;
-  letter-spacing: 1px;
-  border: 1px solid #ddd;
+  background: var(--blue-light);
+  color: var(--blue);
+  padding: 5px 14px;
+  border-radius: 100px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  border: 1px solid rgba(0,74,173,0.15);
 }
 
 /* ============================================================
@@ -143,44 +177,42 @@ h3 {
 .rankings-table {
   width: 100%;
   border-collapse: collapse;
-  margin: 20px 0 40px 0;
+  margin: 12px 0 24px 0;
+  font-size: 13px;
 }
-.rankings-table thead {
-  background: #000;
-  color: #fff;
-}
+.rankings-table thead { background: var(--g50); }
 .rankings-table th {
-  padding: 15px;
+  padding: 10px 12px;
   text-align: left;
-  font-family: 'Bebas Neue', sans-serif;
-  font-size: 14px;
-  letter-spacing: 1px;
-  font-weight: normal;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--g400);
+  border-bottom: 1px solid var(--g200);
 }
 .rankings-table td {
-  padding: 15px;
-  border-bottom: 1px solid #e0e0e0;
-  font-size: 14px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--g100);
+  color: var(--g700);
 }
-.rankings-table tbody tr:hover {
-  background: #f9f9f9;
-}
-.rankings-table tr.client-row {
-  background: #fffacd;
-}
-.rankings-table tr.client-row:hover {
-  background: #fff5b8;
-}
+.rankings-table tbody tr:hover { background: var(--g50); }
+.rankings-table tr.client-row { background: var(--blue-light); }
+.rankings-table tr.client-row td { color: var(--dark); font-weight: 500; }
+.rankings-table tr.client-row:hover { background: #d5e8f7; }
 .rank-badge {
-  display: inline-block;
-  background: #000;
-  color: #fff;
-  padding: 5px 12px;
-  font-family: 'Bebas Neue', sans-serif;
-  font-size: 16px;
-  letter-spacing: 1px;
-  min-width: 40px;
-  text-align: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--g100);
+  color: var(--dark);
+  padding: 3px 10px;
+  border-radius: 8px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 800;
+  min-width: 36px;
 }
 .share-bar-container {
   display: flex;
@@ -189,20 +221,24 @@ h3 {
 }
 .share-bar {
   flex: 1;
-  height: 20px;
-  background: #e8e8e8;
+  height: 8px;
+  background: var(--g200);
+  border-radius: 4px;
   position: relative;
-  max-width: 150px;
+  max-width: 120px;
+  overflow: hidden;
 }
 .share-fill {
   height: 100%;
-  background: #ff9500;
+  background: var(--orange);
+  border-radius: 4px;
   transition: width 0.5s ease;
 }
 .share-text {
-  font-weight: bold;
-  min-width: 45px;
-  font-size: 15px;
+  font-weight: 700;
+  min-width: 40px;
+  font-size: 13px;
+  color: var(--dark);
 }
 
 /* ============================================================
