@@ -22,7 +22,7 @@ _PROJECT_ROOT = str(Path(__file__).resolve().parent.parent)
 if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
-from .supabase_client import get_supabase
+from .supabase_client import get_supabase, execute_with_retry
 from engine.geo_audit_engine import (
     AuditResult,
     ENGINE_DISPLAY_NAMES,
@@ -114,9 +114,17 @@ def run_audit_task(audit_id: str) -> None:
         all_result_rows: list[dict] = []
 
         def on_progress(completed: int, total_count: int, result: AuditResult) -> None:
+            # Always fetch a fresh client — get_supabase() refreshes the
+            # cached client every 45s, so this guards against stale HTTP/2
+            # connections during long audits.
+            sb_inner = get_supabase()
+
             # Check for cancellation periodically (every 10 queries)
             if completed % 10 == 0:
-                check = sb.table("geo_audits").select("status").eq("id", audit_id).single().execute()
+                check = execute_with_retry(
+                    lambda: sb_inner.table("geo_audits").select("status").eq("id", audit_id).single().execute(),
+                    op="cancellation check",
+                )
                 if check.data["status"] == "cancelled":
                     raise InterruptedError("Audit was cancelled.")
 
@@ -140,21 +148,27 @@ def run_audit_task(audit_id: str) -> None:
                 "sentiment": result.sentiment,
                 "response_text": result.response_text[:10000],  # cap at 10k chars
             }
-            sb.table("geo_audit_results").insert(row_data).execute()
+            execute_with_retry(
+                lambda: get_supabase().table("geo_audit_results").insert(row_data).execute(),
+                op=f"insert result prompt={result.prompt_id} engine={result.engine}",
+            )
 
             # Also store for dashboard generation
             all_result_rows.append(row_data)
 
             # Update progress on audit row (triggers Supabase Realtime)
             mention_str = "mentioned" if result.brand_mentioned else "not mentioned"
-            sb.table("geo_audits").update({
-                "progress_current": completed,
-                "progress_message": (
-                    f"[{completed}/{total_count}] {engine_display} — "
-                    f"Prompt #{result.prompt_id}: {mention_str}"
-                ),
-                "updated_at": datetime.now(timezone.utc).isoformat(),
-            }).eq("id", audit_id).execute()
+            execute_with_retry(
+                lambda: get_supabase().table("geo_audits").update({
+                    "progress_current": completed,
+                    "progress_message": (
+                        f"[{completed}/{total_count}] {engine_display} — "
+                        f"Prompt #{result.prompt_id}: {mention_str}"
+                    ),
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                }).eq("id", audit_id).execute(),
+                op="progress update",
+            )
 
         # Run async audit (engine-level parallelism)
         results = asyncio.run(run_audit_async(
