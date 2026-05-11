@@ -147,6 +147,9 @@ def run_audit_task(audit_id: str) -> None:
                 "competitor_mentions": result.competitor_mentions,
                 "sentiment": result.sentiment,
                 "response_text": result.response_text[:10000],  # cap at 10k chars
+                # Persist every URL parsed from the LLM response so the
+                # dashboard can build a "top-cited domains" view.
+                "citations": (result.citation_data or {}).get("all_citations", []) or [],
             }
             execute_with_retry(
                 lambda: get_supabase().table("geo_audit_results").insert(row_data).execute(),

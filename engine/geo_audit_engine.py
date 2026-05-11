@@ -792,6 +792,48 @@ def generate_summary_dict(
         if r.brand_mentioned:
             sentiment_counts[r.sentiment] = sentiment_counts.get(r.sentiment, 0) + 1
 
+    # Top cited domains — aggregate every URL the engines cited across all
+    # responses, normalise to bare domain (drop www.), then rank by share.
+    # Mirrors the "Where do LLMs go for Answers?" infographic the client wants.
+    from collections import Counter
+    from urllib.parse import urlparse
+
+    brand_domain = (
+        url.lower()
+        .replace("https://", "")
+        .replace("http://", "")
+        .replace("www.", "")
+        .split("/")[0]
+        if url
+        else ""
+    )
+
+    domain_counter: Counter[str] = Counter()
+    domain_engines: dict[str, set[str]] = {}
+    for r in valid_results:
+        cites = (r.citation_data or {}).get("all_citations") or []
+        for raw_url in cites:
+            try:
+                netloc = urlparse(raw_url).netloc.lower().replace("www.", "")
+                if not netloc:
+                    continue
+                domain_counter[netloc] += 1
+                domain_engines.setdefault(netloc, set()).add(r.engine)
+            except Exception:
+                continue
+
+    total_citations = sum(domain_counter.values())
+    top_cited_domains = [
+        {
+            "domain": d,
+            "count": c,
+            "share_percent": round(c / total_citations * 100, 1) if total_citations else 0.0,
+            "engines": sorted(domain_engines.get(d, set())),
+            "is_brand": brand_domain != "" and (brand_domain == d or d.endswith("." + brand_domain)),
+        }
+        for d, c in domain_counter.most_common(50)
+    ]
+
     return {
         "audit_metadata": {
             "brand": brand,
@@ -811,6 +853,11 @@ def generate_summary_dict(
             "most_mentioned": sorted_competitors[0][0] if sorted_competitors else None,
         },
         "sentiment_breakdown": sentiment_counts,
+        "top_cited_domains": top_cited_domains,
+        "citation_totals": {
+            "total_citations": total_citations,
+            "unique_domains": len(domain_counter),
+        },
     }
 
 
