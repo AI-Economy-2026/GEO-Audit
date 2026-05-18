@@ -191,7 +191,7 @@ def run_audit_task(audit_id: str) -> None:
 
         # 4. Run analysis modules
         # 4a. Generate base summary
-        summary = generate_summary_dict(results, params["brand_name"])
+        summary = generate_summary_dict(results, params["brand_name"], params.get("brand_url", ""))
 
         # 4b. Keyword gap analysis
         logger.info(f"Audit {audit_id}: Running keyword gap analysis...")
@@ -456,7 +456,7 @@ def run_audit_extension(audit_id: str, prompt_ids: list[int]) -> None:
             for r in all_result_rows
         ]
 
-        summary = generate_summary_dict(all_audit_results, params["brand_name"])
+        summary = generate_summary_dict(all_audit_results, params["brand_name"], params.get("brand_url", ""))
 
         # Re-run analysis modules on full dataset
         logger.info(f"Extension {audit_id}: Running analysis on full dataset ({len(all_result_rows)} results)")

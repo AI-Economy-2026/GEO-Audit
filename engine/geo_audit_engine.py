@@ -740,6 +740,7 @@ def run_audit(
 def generate_summary_dict(
     results: list[AuditResult],
     brand: str,
+    brand_url: str = "",
 ) -> dict:
     """Generate aggregate statistics as a dict (no file writing)."""
     valid_results = [r for r in results if not r.response_text.startswith("[ERROR]")]
@@ -799,12 +800,12 @@ def generate_summary_dict(
     from urllib.parse import urlparse
 
     brand_domain = (
-        url.lower()
+        brand_url.lower()
         .replace("https://", "")
         .replace("http://", "")
         .replace("www.", "")
         .split("/")[0]
-        if url
+        if brand_url
         else ""
     )
 
