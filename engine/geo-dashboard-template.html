@@ -3,18 +3,18 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>GEO Audit — {{CLIENT_NAME}} | AI Economy</title>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700;9..40,800;9..40,900&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<title>GEO Audit — {{CLIENT_NAME}} | RankCo</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700;9..40,800;9..40,900&family=Poppins:wght@300;400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
 <style>
 /* ============================================================
-   GEO AUDIT DASHBOARD — AI ECONOMY DESIGN SYSTEM
+   GEO AUDIT DASHBOARD — RANKCO DESIGN SYSTEM
    Light blue + white cards | #004AAD / #E8890C / #0F172A
    ============================================================ */
-:root{--blue:#004AAD;--blue-light:#E6F1FB;--teal:#0BA5C9;--teal-light:#E0F5FA;--dark:#0F172A;--g700:#334155;--g500:#64748B;--g400:#94A3B8;--g300:#CBD5E1;--g200:#E2E8F0;--g100:#F1F5F9;--g50:#F8FAFC;--white:#fff;--green:#1D9E75;--green-l:#E1F5EE;--orange:#E8890C;--orange-l:#FFF3E0;--red:#DC2626;--red-l:#FEF2F2}
+:root{--blue:#004AAD;--blue-light:#E6F1FB;--teal:#0BA5C9;--teal-light:#E0F5FA;--dark:#0F172A;--g700:#334155;--g500:#64748B;--g400:#94A3B8;--g300:#CBD5E1;--g200:#E2E8F0;--g100:#F1F5F9;--g50:#F8FAFC;--white:#fff;--green:#1D9E75;--green-l:#E1F5EE;--orange:#E8890C;--orange-l:#FFF3E0;--red:#DC2626;--red-l:#FEF2F2;--mint:#14B8A6;--mint-bright:#5EEAD4}
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
-  font-family: 'Poppins', sans-serif;
+  font-family: 'DM Sans', sans-serif;
   line-height: 1.6;
   color: var(--dark);
   background: var(--g100);
@@ -45,7 +45,7 @@ body {
   align-items: center;
 }
 .logo-text {
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Poppins', sans-serif;
   font-size: 13px;
   font-weight: 900;
   letter-spacing: 0.12em;
@@ -53,8 +53,9 @@ body {
   color: var(--dark);
 }
 .logo-text em { font-style: normal; color: var(--blue); }
+.logo-mark{display:inline-block;width:14px;height:14px;border-radius:4px;background:var(--mint-bright);margin-right:8px;vertical-align:-1px;}
 .client-logo {
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Poppins', sans-serif;
   font-size: 15px;
   font-weight: 700;
   color: var(--dark);
@@ -71,7 +72,7 @@ body {
    HEADINGS
    ============================================================ */
 h2 {
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Poppins', sans-serif;
   font-size: 20px;
   font-weight: 800;
   letter-spacing: -0.02em;
@@ -79,7 +80,7 @@ h2 {
   color: var(--dark);
 }
 h3 {
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Poppins', sans-serif;
   font-size: 16px;
   font-weight: 700;
   letter-spacing: -0.01em;
@@ -146,7 +147,7 @@ h3 {
   margin-bottom: 8px;
 }
 .kpi-value {
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Poppins', sans-serif;
   font-size: 36px;
   font-weight: 900;
   color: var(--dark);
@@ -165,7 +166,7 @@ h3 {
   color: var(--blue);
   padding: 5px 14px;
   border-radius: 100px;
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Poppins', sans-serif;
   font-size: 13px;
   font-weight: 600;
   border: 1px solid rgba(0,74,173,0.15);
@@ -184,7 +185,7 @@ h3 {
 .rankings-table th {
   padding: 10px 12px;
   text-align: left;
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Poppins', sans-serif;
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.06em;
@@ -209,7 +210,7 @@ h3 {
   color: var(--dark);
   padding: 3px 10px;
   border-radius: 8px;
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Poppins', sans-serif;
   font-size: 13px;
   font-weight: 800;
   min-width: 36px;
@@ -266,7 +267,7 @@ h3 {
   margin-bottom: 6px;
 }
 .perf-card .perf-value {
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Poppins', sans-serif;
   font-size: 36px;
   font-weight: 900;
   line-height: 1;
@@ -308,7 +309,7 @@ h3 {
 .gap-table th {
   padding: 10px 12px;
   text-align: left;
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Poppins', sans-serif;
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.06em;
@@ -326,9 +327,9 @@ h3 {
   font-weight: 700;
 }
 .priority-badge.critical { background: var(--red-l);    color: var(--red); }
-.priority-badge.high     { background: var(--orange-l); color: var(--orange); }
+.priority-badge.high     { background: var(--red-l);    color: var(--red); }
 .priority-badge.medium   { background: var(--orange-l); color: var(--orange); }
-.priority-badge.low      { background: var(--green-l);  color: var(--green); }
+.priority-badge.low      { background: var(--blue-light); color: var(--blue); }
 
 /* ============================================================
    SECTION 6: STRATEGIC INSIGHTS
@@ -346,7 +347,7 @@ h3 {
   padding: 20px;
 }
 .insight-card h4 {
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Poppins', sans-serif;
   font-size: 14px;
   font-weight: 800;
   color: var(--dark);
@@ -389,7 +390,7 @@ h3 {
   border-radius: 100px;
   padding: 7px 18px;
   cursor: pointer;
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Poppins', sans-serif;
   font-size: 13px;
   font-weight: 600;
   color: var(--g500);
@@ -411,7 +412,7 @@ h3 {
 .prompt-item.has-mention { border-left: 4px solid var(--blue); background: var(--blue-light); }
 .prompt-header { display: flex; justify-content: space-between; align-items: center; gap: 20px; }
 .prompt-left  { display: flex; align-items: center; gap: 12px; flex: 1; }
-.prompt-number { font-family: 'DM Sans', sans-serif; font-size: 16px; font-weight: 800; min-width: 32px; color: var(--g300); }
+.prompt-number { font-family: 'Poppins', sans-serif; font-size: 16px; font-weight: 800; min-width: 32px; color: var(--g300); }
 .prompt-text  { flex: 1; font-size: 14px; font-weight: 400; color: var(--g700); line-height: 1.5; }
 .prompt-right { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
 .status-badge {
@@ -478,7 +479,7 @@ h3 {
   border: 1px solid var(--g200);
   border-radius: 10px;
   cursor: pointer;
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Poppins', sans-serif;
   font-size: 14px;
   font-weight: 600;
   color: var(--dark);
@@ -486,7 +487,7 @@ h3 {
 }
 .pagination-btn:hover:not(:disabled) { background: var(--blue); color: var(--white); border-color: var(--blue); }
 .pagination-btn:disabled { opacity: 0.3; cursor: not-allowed; }
-.page-info { font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 600; color: var(--g500); }
+.page-info { font-family: 'Poppins', sans-serif; font-size: 14px; font-weight: 600; color: var(--g500); }
 
 /* ============================================================
    MODAL
@@ -522,7 +523,7 @@ h3 {
   border-bottom: 1px solid var(--g200);
 }
 .modal-title {
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Poppins', sans-serif;
   font-size: 18px;
   font-weight: 800;
   color: var(--dark);
@@ -553,7 +554,7 @@ h3 {
   border-radius: 4px;
 }
 .mention-number {
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Poppins', sans-serif;
   font-size: 12px;
   font-weight: 700;
   color: var(--g400);
@@ -574,7 +575,7 @@ h3 {
   margin-top: 40px;
 }
 .footer .foot-brand {
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Poppins', sans-serif;
   font-size: 13px;
   font-weight: 900;
   letter-spacing: 0.12em;
@@ -607,6 +608,23 @@ h3 {
   .cat-perf-label { min-width: 110px; font-size: 12px; }
   .header { flex-direction: column; align-items: flex-start; gap: 4px; }
 }
+
+/* ============================================================
+   PRINT / PDF
+   ============================================================ */
+@media print {
+  .header { position: static !important; }
+  body { background: var(--white) !important; }
+  .header { backdrop-filter: none !important; }
+  .kpi-card, .perf-card, .exec-summary, .insight-card,
+  .modal-content, .prompt-item { box-shadow: none !important; }
+  .engines-grid { display: grid !important; }
+  .prompt-card, .prompt-item { display: block !important; }
+  .pagination { display: none !important; }
+  #mentionModal { display: none !important; }
+  .kpi-card, .perf-card, .exec-summary, .rankings-table, .prompt-card,
+  .prompt-item { break-inside: avoid; page-break-inside: avoid; }
+}
 </style>
 </head>
 <body>
@@ -617,7 +635,7 @@ h3 {
      ============================================================ -->
 <div class="header">
   <div>
-    <div class="logo-text">AI <em>Economy</em></div>
+    <div class="logo-text"><span class="logo-mark" aria-hidden="true"></span>Rank<em>Co</em></div>
     <div style="font-size:11px;color:#64748B;margin-top:2px;">GEO Audit &amp; Action Plan</div>
   </div>
   <div>
@@ -637,7 +655,7 @@ h3 {
 <!-- ============================================================
      SECTION 2.5: KEYWORDS
      ============================================================ -->
-<div class="keywords-section" style="margin:0 0 28px 0;">
+<div class="keywords-section" id="keywordsSection" style="margin:0 0 28px 0;">
   <h3 style="margin-top:0;margin-bottom:12px;">Target Keywords</h3>
   <div id="keywordsContainer" style="display:flex;gap:8px;flex-wrap:wrap;">
     <!-- Populated by JavaScript -->
@@ -684,7 +702,7 @@ h3 {
 <!-- ============================================================
      SECTION 4: RANKINGS BY CATEGORY
      ============================================================ -->
-<h2>{{CLIENT_NAME}} Rankings by Category</h2>
+<h2 id="rankingsHeading">{{CLIENT_NAME}} Rankings by Category</h2>
 
 <div id="rankingsContainer">
   <!-- Populated by JavaScript from CATEGORY_RANKINGS data -->
@@ -705,7 +723,7 @@ h3 {
   <!-- Populated by JavaScript -->
 </div>
 
-<h3>Category Performance</h3>
+<h3 id="categoryBarsHeading">Category Performance</h3>
 <div id="categoryBars">
   <!-- Populated by JavaScript -->
 </div>
@@ -790,8 +808,8 @@ h3 {
      FOOTER
      ============================================================ -->
 <footer class="footer">
-  <div class="foot-brand">AI <span style="color:#E8890C">Economy</span></div>
-  <p class="foot-copy" style="font-size:12px;color:#94A3B8;margin-top:6px;">Generative Engine Optimisation &nbsp;&middot;&nbsp; &copy; 2026 AI Economy. ABN: 24602295698</p>
+  <div class="foot-brand">Rank<span style="color:var(--blue)">Co</span></div>
+  <p class="foot-copy" style="font-size:12px;color:#94A3B8;margin-top:6px;">Generative Engine Optimisation &nbsp;&middot;&nbsp; &copy; 2026 RankCo. ABN: 24602295698</p>
 </footer>
 
 </div><!-- /.container -->
@@ -799,11 +817,11 @@ h3 {
 <!-- ============================================================
      MODAL FOR MENTION DETAILS
      ============================================================ -->
-<div class="modal" id="mentionModal">
+<div class="modal" id="mentionModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
   <div class="modal-content">
     <div class="modal-header">
       <div class="modal-title" id="modalTitle"></div>
-      <span class="modal-close" id="modalClose">&times;</span>
+      <span class="modal-close" id="modalClose" role="button" tabindex="0" aria-label="Close">&times;</span>
     </div>
     <div id="modalBody"></div>
   </div>
@@ -824,7 +842,11 @@ var KEYWORDS = {{KEYWORDS_JSON}};
 // Render Keywords
 (function renderKeywords() {
   var container = document.getElementById('keywordsContainer');
-  if (!container || !KEYWORDS || !KEYWORDS.length) return;
+  if (!container || !KEYWORDS || !KEYWORDS.length) {
+    var kwSection = document.getElementById('keywordsSection');
+    if (kwSection) kwSection.style.display = 'none';
+    return;
+  }
   KEYWORDS.forEach(function(kw) {
     container.innerHTML += '<span class="keyword-pill">' + kw + '</span>';
   });
@@ -835,7 +857,11 @@ var KEYWORDS = {{KEYWORDS_JSON}};
 // ============================================================
 (function renderRankings() {
   var container = document.getElementById('rankingsContainer');
-  if (!CATEGORY_RANKINGS || !CATEGORY_RANKINGS.length) return;
+  if (!CATEGORY_RANKINGS || !CATEGORY_RANKINGS.length) {
+    var rHeading = document.getElementById('rankingsHeading');
+    if (rHeading) rHeading.style.display = 'none';
+    return;
+  }
 
   CATEGORY_RANKINGS.forEach(function(cat) {
     var section = document.createElement('div');
@@ -870,6 +896,7 @@ var KEYWORDS = {{KEYWORDS_JSON}};
 // SECTION 5: Engine Performance Cards
 // ============================================================
 (function renderEnginePerformance() {
+  if (!ENGINE_DATA || !ENGINE_DATA.length) return;
   // Sort engines by rate descending
   var sorted = ENGINE_DATA.slice().sort(function(a, b) { return b.rate - a.rate; });
 
@@ -922,7 +949,11 @@ var KEYWORDS = {{KEYWORDS_JSON}};
 // ============================================================
 (function renderCategoryBars() {
   var container = document.getElementById('categoryBars');
-  if (!CATEGORY_PERF || !CATEGORY_PERF.length) return;
+  if (!CATEGORY_PERF || !CATEGORY_PERF.length) {
+    var cbHeading = document.getElementById('categoryBarsHeading');
+    if (cbHeading) cbHeading.style.display = 'none';
+    return;
+  }
 
   CATEGORY_PERF.forEach(function(cat) {
     var fillClass = 'low';
@@ -1041,31 +1072,33 @@ function renderPrompts() {
     header += '<div class="prompt-right">';
 
     if (hasMention) {
-      header += '<span class="status-badge mentioned">&#10003; ' + CLIENT_NAME + ' Mentioned</span>';
+      header += '<span class="status-badge mentioned"><span role="img" aria-label="Mentioned">&#10003;</span> ' + CLIENT_NAME + ' Mentioned</span>';
     } else {
-      header += '<span class="status-badge not-mentioned">&#10007; Not Mentioned</span>';
+      header += '<span class="status-badge not-mentioned"><span role="img" aria-label="Not mentioned">&#10007;</span> Not Mentioned</span>';
     }
 
     header += '<div class="prompt-stats">';
     header += '<span class="stat-group"><span class="stat-number">' + mentionCount + '/' + engineNames.length + '</span> <span class="stat-label">engines</span></span>';
     header += '</div>';
-    header += '<span class="expand-arrow">&#9660;</span>';
+    header += '<span class="expand-arrow" role="button" tabindex="0" aria-expanded="false" aria-label="Toggle engine details">&#9660;</span>';
     header += '</div></div>';
 
     var grid = '<div class="engines-grid">';
     engineNames.forEach(function(eName) {
       var eData = engines[eName];
-      var itemClass = eData.mentioned && eData.status !== 'failed' ? 'engine-item has-mention' : 'engine-item';
+      var isClickable = eData.mentioned && eData.status !== 'failed';
+      var itemClass = isClickable ? 'engine-item has-mention' : 'engine-item';
+      var clickHandler = 'showMention(\'' + eName.replace(/'/g, "\\'") + '\', ' + JSON.stringify(p.prompt).replace(/"/g, '&quot;') + ', ' + JSON.stringify(eData.excerpt || '').replace(/"/g, '&quot;') + ')';
       grid += '<div class="' + itemClass + '" ' +
-        (eData.mentioned && eData.status !== 'failed' ? 'onclick="showMention(\'' + eName.replace(/'/g, "\\'") + '\', ' + JSON.stringify(p.prompt).replace(/"/g, '&quot;') + ', ' + JSON.stringify(eData.excerpt || '').replace(/"/g, '&quot;') + ')"' : '') + '>';
+        (isClickable ? 'role="button" tabindex="0" aria-label="View ' + eName + ' mention detail" onclick="' + clickHandler + '" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();' + clickHandler + ';}"' : '') + '>';
       grid += '<span class="engine-name">' + eName + '</span>';
-      
+
       if (eData.status === 'failed') {
         grid += '<span style="color:#999; font-size:11px; font-weight:bold;">&mdash; Data unavailable</span>';
       } else if (eData.mentioned) {
-        grid += '<span class="mention-check">&#10003; MENTIONED</span>';
+        grid += '<span class="mention-check"><span role="img" aria-label="Mentioned">&#10003;</span> MENTIONED</span>';
       } else {
-        grid += '<span class="mention-miss">&#10007; Not mentioned</span>';
+        grid += '<span class="mention-miss"><span role="img" aria-label="Not mentioned">&#10007;</span> Not mentioned</span>';
       }
       grid += '</div>';
     });
@@ -1073,13 +1106,28 @@ function renderPrompts() {
 
     item.innerHTML = header + grid;
 
-    // Toggle expand on click
-    item.addEventListener('click', function(e) {
-      if (e.target.closest('.engine-item.has-mention')) return;
+    // Toggle expand on click / keyboard
+    function toggleExpand() {
       item.classList.toggle('expanded');
       var engGrid = item.querySelector('.engines-grid');
       engGrid.classList.toggle('show');
+      var arrow = item.querySelector('.expand-arrow');
+      if (arrow) arrow.setAttribute('aria-expanded', item.classList.contains('expanded') ? 'true' : 'false');
+    }
+    item.addEventListener('click', function(e) {
+      if (e.target.closest('.engine-item.has-mention')) return;
+      toggleExpand();
     });
+    var arrowEl = item.querySelector('.expand-arrow');
+    if (arrowEl) {
+      arrowEl.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          e.stopPropagation();
+          toggleExpand();
+        }
+      });
+    }
 
     container.appendChild(item);
   });
@@ -1118,12 +1166,21 @@ function showMention(engine, prompt, excerpt) {
   modal.style.display = 'block';
 }
 
-document.getElementById('modalClose').onclick = function() {
+function closeMentionModal() {
   document.getElementById('mentionModal').style.display = 'none';
-};
+}
+document.getElementById('modalClose').onclick = closeMentionModal;
+document.getElementById('modalClose').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); closeMentionModal(); }
+});
 document.getElementById('mentionModal').onclick = function(e) {
-  if (e.target === this) this.style.display = 'none';
+  if (e.target === this) closeMentionModal();
 };
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape' && document.getElementById('mentionModal').style.display === 'block') {
+    closeMentionModal();
+  }
+});
 
 // Initial render
 renderPrompts();

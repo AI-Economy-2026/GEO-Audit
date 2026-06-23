@@ -278,30 +278,35 @@ class AuditAnalysis:
 
     def _generate_findings(self):
         findings = []
-        best_cat = max(self.category_data, key=lambda c: c["visibility"])
-        worst_cat = min(self.category_data, key=lambda c: c["visibility"])
-        findings.append(
-            f"{self.client_name} achieves a {self.visibility_rate}% overall "
-            f"AI visibility rate, with strongest performance in "
-            f"{best_cat['name']} ({best_cat['visibility']}%) and lowest in "
-            f"{worst_cat['name']} ({worst_cat['visibility']}%)."
-        )
-        best_engine = max(self.engine_data, key=lambda e: e["rate"])
+        best_cat = max(self.category_data, key=lambda c: c["visibility"]) if self.category_data else None
+        worst_cat = min(self.category_data, key=lambda c: c["visibility"]) if self.category_data else None
+        if best_cat and worst_cat:
+            findings.append(
+                f"{self.client_name} achieves a {self.visibility_rate}% overall "
+                f"AI visibility rate, with strongest performance in "
+                f"{best_cat['name']} ({best_cat['visibility']}%) and lowest in "
+                f"{worst_cat['name']} ({worst_cat['visibility']}%)."
+            )
+        else:
+            findings.append(
+                f"{self.client_name} achieves a {self.visibility_rate}% overall AI visibility rate."
+            )
+        best_engine = max(self.engine_data, key=lambda e: e["rate"]) if self.engine_data else None
         low_engines = [e for e in self.engine_data if e["rate"] < self.visibility_rate]
-        if low_engines:
+        if best_engine and low_engines:
             low_str = " and ".join(f"{e['name']} ({e['rate']}%)" for e in low_engines)
             findings.append(
                 f"{best_engine['name']} is the strongest-performing engine "
                 f"at {best_engine['rate']}% mention rate, while {low_str} "
                 f"represent the largest gaps and immediate improvement opportunities."
             )
-        else:
+        elif best_engine:
             worst_engine = min(self.engine_data, key=lambda e: e["rate"])
             findings.append(
                 f"{best_engine['name']} leads at {best_engine['rate']}% mention rate. "
                 f"{worst_engine['name']} at {worst_engine['rate']}% represents the primary improvement opportunity."
             )
-        if self.best_rank is not None and self.best_rank <= 2:
+        if best_cat and self.best_rank is not None and self.best_rank <= 2:
             top_rank_rows = [r for r in self.valid_rows if r["position_rank"] is not None and r["position_rank"] <= 2]
             findings.append(
                 f"{self.client_name} achieves a top-2 ranking position in "
@@ -309,7 +314,7 @@ class AuditAnalysis:
                 f"{best_cat['name']} queries yield the highest visibility "
                 f"({best_cat['visibility']}%), indicating strong brand association in this segment."
             )
-        else:
+        elif best_cat and worst_cat:
             findings.append(
                 f"The {best_cat['name']} category shows strong brand recognition with "
                 f"{best_cat['visibility']}% visibility. Expanding content in the "
@@ -318,9 +323,9 @@ class AuditAnalysis:
         self.findings = findings
 
     def _generate_recommendations(self):
-        best_engine = max(self.engine_data, key=lambda e: e["rate"])
-        best_cat = max(self.category_data, key=lambda c: c["visibility"])
-        worst_cat = min(self.category_data, key=lambda c: c["visibility"])
+        best_engine = max(self.engine_data, key=lambda e: e["rate"]) if self.engine_data else None
+        best_cat = max(self.category_data, key=lambda c: c["visibility"]) if self.category_data else None
+        worst_cat = min(self.category_data, key=lambda c: c["visibility"]) if self.category_data else None
         low_engines = sorted([e for e in self.engine_data if e["rate"] < self.visibility_rate], key=lambda e: e["rate"])
         low_engine_missed = sum(e["missed"] for e in low_engines)
 
@@ -330,11 +335,13 @@ class AuditAnalysis:
             priorities.append(f"Address {engine_names} visibility gaps - these engines account for {low_engine_missed} missed opportunities. Create structured, schema-rich content targeting these platforms.")
         else:
             priorities.append("Maintain current visibility across all engines while focusing on improving ranking positions. Target top-3 placement in all queries.")
-        priorities.append(f"Strengthen '{worst_cat['name']}' positioning with dedicated landing pages, case studies, and thought leadership content that AI engines can reference.")
+        if worst_cat:
+            priorities.append(f"Strengthen '{worst_cat['name']}' positioning with dedicated landing pages, case studies, and thought leadership content that AI engines can reference.")
         priorities.append("Build authoritative third-party citations on industry directories, comparison sites, and analyst reports to improve AI training data signals.")
 
         sector = []
-        sector.append(f"Develop {worst_cat['name'].lower()} content - currently at {worst_cat['visibility']}% visibility. Publish case studies and comparison content targeting this segment.")
+        if worst_cat:
+            sector.append(f"Develop {worst_cat['name'].lower()} content - currently at {worst_cat['visibility']}% visibility. Publish case studies and comparison content targeting this segment.")
         if self.top_competitors:
             top_comps = ", ".join(c[0] for c in self.top_competitors[:3])
             sector.append(f"Create comparison content positioning {self.client_name} against {top_comps} to capture 'alternatives' and competitive queries.")
@@ -343,13 +350,15 @@ class AuditAnalysis:
         sector.append("Invest in educational content to own informational queries and build topical authority across all service categories.")
 
         leverage = []
-        leverage.append(f"Amplify the {best_cat['name']} advantage - {best_cat['visibility']}% visibility. Expand content library and PR efforts in this high-performing segment.")
-        high_vis = [p for p in self.prompt_data if sum(1 for e in p["engines"].values() if e["mentioned"]) == len(p["engines"])]
+        if best_cat:
+            leverage.append(f"Amplify the {best_cat['name']} advantage - {best_cat['visibility']}% visibility. Expand content library and PR efforts in this high-performing segment.")
+        high_vis = [p for p in self.prompt_data if p["engines"] and sum(1 for e in p["engines"].values() if e["mentioned"]) == len(p["engines"])]
         if high_vis:
             leverage.append(f"{self.client_name} appears in 100% of engines for {len(high_vis)} queries. Analyse these high-performing prompts and replicate the content patterns across weaker areas.")
         else:
             leverage.append(f"Identify queries where {self.client_name} appears in the most engines and analyse what content patterns drive visibility. Replicate these across weaker areas.")
-        leverage.append(f"{best_engine['name']} at {best_engine['rate']}% shows the strongest engine affinity. Analyse {best_engine['name']}'s content preferences and replicate successful patterns across other engines.")
+        if best_engine:
+            leverage.append(f"{best_engine['name']} at {best_engine['rate']}% shows the strongest engine affinity. Analyse {best_engine['name']}'s content preferences and replicate successful patterns across other engines.")
 
         self.rec_priorities = priorities
         self.rec_sector = sector
@@ -371,7 +380,7 @@ class AuditAnalysis:
             f"visibility across {self.total_prompts} search prompts spanning "
             f"{len(self.categories)} categories: {cat_names}. Testing was "
             f"conducted across {len(self.engines)} leading AI engines "
-            f"\\u2014 {engine_names} \\u2014 to measure how frequently "
+            f"— {engine_names} — to measure how frequently "
             f"{self.client_name} is surfaced in generative AI responses to "
             f"queries that real buyers and decision-makers would use."
         )
@@ -426,10 +435,10 @@ def _build_replacements(analysis: AuditAnalysis) -> dict[str, str]:
     r["CATEGORIES"] = f"{analysis.category_count} categories"
     r["CATEGORY_COUNT"] = str(analysis.category_count)
     r["ENGINE_NAMES_SHORT"] = ", ".join(analysis.engines)
-    best_cat = max(analysis.category_data, key=lambda c: c["visibility"])
-    worst_cat = min(analysis.category_data, key=lambda c: c["visibility"])
-    r["BEST_CATEGORY"] = f"{best_cat['name']} ({best_cat['visibility']}%)"
-    r["WORST_CATEGORY"] = f"{worst_cat['name']} ({worst_cat['visibility']}%)"
+    best_cat = max(analysis.category_data, key=lambda c: c["visibility"]) if analysis.category_data else None
+    worst_cat = min(analysis.category_data, key=lambda c: c["visibility"]) if analysis.category_data else None
+    r["BEST_CATEGORY"] = f"{best_cat['name']} ({best_cat['visibility']}%)" if best_cat else "-"
+    r["WORST_CATEGORY"] = f"{worst_cat['name']} ({worst_cat['visibility']}%)" if worst_cat else "-"
     for i, cat in enumerate(analysis.category_data[:3], 1):
         r[f"CATEGORY_{i}_NAME"] = cat["name"]
         r[f"CATEGORY_{i}_VISIBILITY"] = f"{cat['visibility']}%"
