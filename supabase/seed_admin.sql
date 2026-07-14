@@ -1,5 +1,5 @@
 -- =============================================================
--- Bootstrap seeder — first RankCo admin
+-- Bootstrap seeder — first Gatha admin
 -- =============================================================
 -- Run AFTER 090_admin_credits.sql.
 --
@@ -83,10 +83,10 @@ BEGIN
 
   -- 2. Upsert app_users profile with role='admin' and unlimited-feel credits
   INSERT INTO public.app_users (id, role, email, agency_name, credits_remaining)
-  VALUES (admin_id, 'admin', admin_email, 'RankCo Admin', 0)
+  VALUES (admin_id, 'admin', admin_email, 'Gatha Admin', 0)
   ON CONFLICT (id) DO UPDATE
     SET role = 'admin',
-        agency_name = COALESCE(app_users.agency_name, 'RankCo Admin'),
+        agency_name = COALESCE(app_users.agency_name, 'Gatha Admin'),
         updated_at = NOW();
 END $$;
 

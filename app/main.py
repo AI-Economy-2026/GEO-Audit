@@ -112,16 +112,16 @@ def _send_invite_email(to: str, agency_name: str, password: str, login_url: str)
             <tr>
               <td style="background:linear-gradient(135deg,#0e1a2d,#1a2f4a);padding:32px 40px;text-align:center;">
                 <div style="display:inline-block;background:linear-gradient(135deg,#5eead4,#2dd4bf);border-radius:10px;padding:10px 14px;margin-bottom:14px;">
-                  <span style="font-size:22px;font-weight:900;color:#0e1a2d;letter-spacing:-1px;">R</span>
+                  <span style="font-size:22px;font-weight:900;color:#0e1a2d;letter-spacing:-1px;">G</span>
                 </div>
-                <div style="color:#ffffff;font-size:22px;font-weight:700;letter-spacing:-0.5px;">RankCo</div>
+                <div style="color:#ffffff;font-size:22px;font-weight:700;letter-spacing:-0.5px;">Gatha</div>
                 <div style="color:#5eead4;font-size:11px;font-weight:600;letter-spacing:2px;text-transform:uppercase;margin-top:4px;">AI Visibility Platform</div>
               </td>
             </tr>
             <!-- Body -->
             <tr>
               <td style="padding:36px 40px;">
-                <p style="margin:0 0 8px;font-size:22px;font-weight:700;color:#0e1a2d;">Welcome to RankCo, {agency_name}!</p>
+                <p style="margin:0 0 8px;font-size:22px;font-weight:700;color:#0e1a2d;">Welcome to Gatha, {agency_name}!</p>
                 <p style="margin:0 0 28px;font-size:14px;color:#64748b;line-height:1.6;">
                   Your agency account is ready. Use the credentials below to log in and start running AI visibility audits.
                 </p>
@@ -147,7 +147,7 @@ def _send_invite_email(to: str, agency_name: str, password: str, login_url: str)
                 </table>
 
                 <a href="{login_url}" style="display:inline-block;background:linear-gradient(135deg,#5eead4,#2dd4bf);color:#0e1a2d;font-weight:700;font-size:14px;text-decoration:none;padding:13px 28px;border-radius:8px;">
-                  Log in to RankCo →
+                  Log in to Gatha →
                 </a>
 
                 <p style="margin:28px 0 0;font-size:12px;color:#94a3b8;line-height:1.6;">
@@ -158,7 +158,7 @@ def _send_invite_email(to: str, agency_name: str, password: str, login_url: str)
             <!-- Footer -->
             <tr>
               <td style="padding:20px 40px;background:#f8fafc;border-top:1px solid #e2e8f0;text-align:center;">
-                <p style="margin:0;font-size:11px;color:#94a3b8;">© RankCo · AI Search Visibility Platform</p>
+                <p style="margin:0;font-size:11px;color:#94a3b8;">© Gatha · AI Search Visibility Platform</p>
               </td>
             </tr>
           </table>
@@ -169,7 +169,7 @@ def _send_invite_email(to: str, agency_name: str, password: str, login_url: str)
     """
 
     msg = MIMEMultipart("alternative")
-    msg["Subject"] = f"Welcome to RankCo — your login details"
+    msg["Subject"] = f"Welcome to Gatha — your login details"
     msg["From"] = smtp_from
     msg["To"] = to
     msg.attach(MIMEText(html, "html"))
