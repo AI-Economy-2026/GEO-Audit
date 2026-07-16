@@ -14,10 +14,12 @@ import urllib.parse
 import urllib.request
 import urllib.error
 
+from engine.geo_locale import locale_for
+
 logger = logging.getLogger(__name__)
 
 
-def check_site_index(domain: str) -> dict:
+def check_site_index(domain: str, country: str | None = None) -> dict:
     """
     Check how many pages are indexed for a domain via SerpAPI.
 
@@ -30,12 +32,14 @@ def check_site_index(domain: str) -> dict:
     # Clean domain
     domain = domain.lower().replace("https://", "").replace("http://", "").replace("www.", "").rstrip("/")
 
+    _loc = locale_for(country)
     try:
         params = urllib.parse.urlencode({
             "engine": "google",
             "q": f"site:{domain}",
             "api_key": api_key,
             "num": 10,
+            **({"gl": _loc["gl"], "hl": _loc["hl"]} if _loc else {}),
         })
         url = f"https://www.searchapi.io/api/v1/search?{params}"
         req = urllib.request.Request(url)
@@ -70,6 +74,7 @@ def check_site_index(domain: str) -> dict:
 def check_organic_rankings(
     prompts: list[dict],
     domain: str,
+    country: str | None = None,
 ) -> list[dict]:
     """
     Check Google organic rankings for each prompt.
@@ -95,6 +100,7 @@ def check_organic_rankings(
             seen.add(p["prompt_id"])
             unique_prompts.append(p)
 
+    _loc = locale_for(country)
     for prompt in unique_prompts[:20]:  # Cap at 20 SerpAPI calls
         try:
             params = urllib.parse.urlencode({
@@ -102,6 +108,7 @@ def check_organic_rankings(
                 "q": prompt["prompt_text"],
                 "api_key": api_key,
                 "num": 10,
+                **({"gl": _loc["gl"], "hl": _loc["hl"]} if _loc else {}),
             })
             url = f"https://www.searchapi.io/api/v1/search?{params}"
             req = urllib.request.Request(url)

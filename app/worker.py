@@ -181,6 +181,7 @@ def run_audit_task(audit_id: str) -> None:
             competitors=params["competitors"],
             engines=engines,
             progress_callback=on_progress,
+            country=params.get("country"),
         ))
 
         # Update progress for analysis phase
@@ -208,7 +209,7 @@ def run_audit_task(audit_id: str) -> None:
             "progress_message": "Checking business directories...",
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }).eq("id", audit_id).execute()
-        directory_results = check_directories(params["brand_name"])
+        directory_results = check_directories(params["brand_name"], country=params.get("country"))
         summary["directory_citations"] = directory_results
 
         # 4d. SERP analysis
@@ -218,10 +219,10 @@ def run_audit_task(audit_id: str) -> None:
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }).eq("id", audit_id).execute()
 
-        site_index = check_site_index(params["brand_url"])
+        site_index = check_site_index(params["brand_url"], country=params.get("country"))
 
         prompt_dicts = [{"prompt_id": p.prompt_id, "prompt_text": p.prompt_text} for p in prompts]
-        organic_rankings = check_organic_rankings(prompt_dicts, params["brand_url"])
+        organic_rankings = check_organic_rankings(prompt_dicts, params["brand_url"], country=params.get("country"))
 
         serp_comparison = compare_ai_vs_seo(all_result_rows, organic_rankings)
         summary["serp_analysis"] = {
@@ -411,6 +412,7 @@ def run_audit_extension(audit_id: str, prompt_ids: list[int]) -> None:
             competitors=params["competitors"],
             engines=engines,
             progress_callback=on_progress,
+            country=params.get("country"),
         ))
 
         # Now regenerate full summary from ALL results
@@ -468,7 +470,7 @@ def run_audit_extension(audit_id: str, prompt_ids: list[int]) -> None:
         )
         summary["keyword_gap_analysis"] = keyword_gaps
 
-        directory_results = check_directories(params["brand_name"])
+        directory_results = check_directories(params["brand_name"], country=params.get("country"))
         summary["directory_citations"] = directory_results
 
         # Load all prompts for SERP analysis
@@ -484,8 +486,8 @@ def run_audit_extension(audit_id: str, prompt_ids: list[int]) -> None:
             for p in all_prompts_resp.data
         ]
 
-        site_index = check_site_index(params["brand_url"])
-        organic_rankings = check_organic_rankings(prompt_dicts, params["brand_url"])
+        site_index = check_site_index(params["brand_url"], country=params.get("country"))
+        organic_rankings = check_organic_rankings(prompt_dicts, params["brand_url"], country=params.get("country"))
         serp_comparison = compare_ai_vs_seo(all_result_rows, organic_rankings)
         summary["serp_analysis"] = {
             "site_indexed": site_index,

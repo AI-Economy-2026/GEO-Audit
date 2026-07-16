@@ -14,6 +14,8 @@ import urllib.parse
 import urllib.request
 import urllib.error
 
+from engine.geo_locale import locale_for
+
 logger = logging.getLogger(__name__)
 
 DIRECTORIES = [
@@ -48,7 +50,7 @@ DIRECTORIES = [
 ]
 
 
-def check_directories(brand: str) -> list[dict]:
+def check_directories(brand: str, country: str | None = None) -> list[dict]:
     """
     Check whether the brand is listed on key directories via SerpAPI.
 
@@ -61,6 +63,7 @@ def check_directories(brand: str) -> list[dict]:
             for d in DIRECTORIES
         ]
 
+    _loc = locale_for(country)
     results = []
     for directory in DIRECTORIES:
         query = directory["search_template"].replace("{brand}", brand)
@@ -70,6 +73,7 @@ def check_directories(brand: str) -> list[dict]:
                 "q": query,
                 "api_key": api_key,
                 "num": 3,
+                **({"gl": _loc["gl"], "hl": _loc["hl"]} if _loc else {}),
             })
             url = f"https://www.searchapi.io/api/v1/search?{params}"
             req = urllib.request.Request(url)

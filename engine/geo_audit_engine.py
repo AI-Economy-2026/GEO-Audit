@@ -22,6 +22,8 @@ from datetime import datetime, timezone
 from typing import Callable, Optional
 import logging
 
+from engine.geo_locale import location_prompt_prefix, SCRAPER_ENGINES
+
 # from tenacity import (
 #     retry,
 #     stop_after_attempt,
@@ -876,8 +878,11 @@ async def _run_engine_prompts(
     progress_counter: list[int],
     total_tasks: int,
     progress_callback: Optional[ProgressCallback],
+    country: Optional[str] = None,
 ) -> list[AuditResult]:
     """Run all prompts for a single engine sequentially with rate limiting."""
+    # Localise LLM prompts with a country hint (scrapers use search locale instead).
+    _prefix = location_prompt_prefix(country) if engine not in SCRAPER_ENGINES else ""
     results: list[AuditResult] = []
     rate_limit = ENGINE_RATE_LIMITS.get(engine, 1.0)
     loop = asyncio.get_event_loop()
@@ -898,7 +903,7 @@ async def _run_engine_prompts(
         for attempt in range(1, MAX_RETRIES + 2):
             try:
                 raw_response = await loop.run_in_executor(
-                    executor, query_fn, prompt.prompt_text
+                    executor, query_fn, _prefix + prompt.prompt_text
                 )
                 success = True
                 break
@@ -961,6 +966,7 @@ async def run_audit_async(
     competitors: list[str],
     engines: list[str],
     progress_callback: Optional[ProgressCallback] = None,
+    country: Optional[str] = None,
 ) -> list[AuditResult]:
     """
     Run the audit with engine-level parallelism.
@@ -987,6 +993,7 @@ async def run_audit_async(
                 progress_counter=progress_counter,
                 total_tasks=total_tasks,
                 progress_callback=progress_callback,
+                country=country,
             )
             for engine in engines
         ]
