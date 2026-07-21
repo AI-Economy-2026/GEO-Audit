@@ -98,7 +98,7 @@ def generate_alice_brief(
 
         # Determine content type based on the gap
         if n_missed == n_tested:
-            # Invisible everywhere — need a landing page
+            # Invisible everywhere: need a landing page
             content_type = "landing_page"
             title = f"Why {brand} is the Best Choice for {gap['category']}"
             outline = [
@@ -109,7 +109,7 @@ def generate_alice_brief(
                 "Include comparison table vs competitors" if competitors_present else "Include industry benchmarks",
             ]
         elif competitors_present:
-            # Competitors present — comparison article
+            # Competitors present: comparison article
             content_type = "comparison_article"
             top_comp = competitors_present[0]
             title = f"{brand} vs {top_comp}: Which is Better for {gap['category']}?"
@@ -121,7 +121,7 @@ def generate_alice_brief(
                 "Conclusion with clear recommendation",
             ]
         else:
-            # General gap — blog post
+            # General gap: blog post
             content_type = "blog_post"
             title = f"Complete Guide to {gap['category']} by {brand}"
             outline = [
@@ -162,7 +162,7 @@ def generate_alice_brief(
             "title": strip_em_dashes(f"{brand}'s Approach to {opp['category']}"),
             "target_query": opp["prompt_text"],
             "target_category": opp["category"],
-            "priority_score": 30,  # Medium priority — easy win
+            "priority_score": 30,  # Medium priority, easy win
             "severity": "opportunity",
             "rationale": "No brands mentioned for this query, a first-mover advantage.",
             "target_engines": [],

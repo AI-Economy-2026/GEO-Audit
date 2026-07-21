@@ -1,7 +1,7 @@
 """
 Deterministic prompt classification.
 
-Two pure functions — no LLM calls, no side effects.
+Two pure functions: no LLM calls, no side effects.
 Used by the worker to annotate prompts and results with
 prompt_type and intent_type before storing to Supabase.
 """

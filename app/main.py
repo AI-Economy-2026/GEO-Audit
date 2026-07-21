@@ -2,8 +2,8 @@
 FastAPI entry point for the GEO Audit Worker.
 
 Endpoints:
-    GET  /api/health         — Health check
-    POST /api/audits/start   — Trigger a background audit task
+    GET  /api/health         - Health check
+    POST /api/audits/start   - Trigger a background audit task
 """
 
 from __future__ import annotations
@@ -91,7 +91,7 @@ async def health():
 
 
 def _send_invite_email(to: str, agency_name: str, password: str, login_url: str):
-    """Synchronous SMTP send — called via asyncio.to_thread."""
+    """Synchronous SMTP send, called via asyncio.to_thread."""
     smtp_host = os.environ.get("SMTP_HOST", "")
     smtp_port = int(os.environ.get("SMTP_PORT", "587"))
     smtp_user = os.environ.get("SMTP_USER", "")
@@ -169,7 +169,7 @@ def _send_invite_email(to: str, agency_name: str, password: str, login_url: str)
     """
 
     msg = MIMEMultipart("alternative")
-    msg["Subject"] = f"Welcome to Gatha — your login details"
+    msg["Subject"] = f"Welcome to Gatha: your login details"
     msg["From"] = smtp_from
     msg["To"] = to
     msg.attach(MIMEText(html, "html"))

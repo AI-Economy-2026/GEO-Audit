@@ -114,7 +114,7 @@ def run_audit_task(audit_id: str) -> None:
         all_result_rows: list[dict] = []
 
         def on_progress(completed: int, total_count: int, result: AuditResult) -> None:
-            # Always fetch a fresh client — get_supabase() refreshes the
+            # Always fetch a fresh client: get_supabase() refreshes the
             # cached client every 45s, so this guards against stale HTTP/2
             # connections during long audits.
             sb_inner = get_supabase()
@@ -165,7 +165,7 @@ def run_audit_task(audit_id: str) -> None:
                 lambda: get_supabase().table("geo_audits").update({
                     "progress_current": completed,
                     "progress_message": (
-                        f"[{completed}/{total_count}] {engine_display} — "
+                        f"[{completed}/{total_count}] {engine_display}: "
                         f"Prompt #{result.prompt_id}: {mention_str}"
                     ),
                     "updated_at": datetime.now(timezone.utc).isoformat(),
@@ -397,7 +397,7 @@ def run_audit_extension(audit_id: str, prompt_ids: list[int]) -> None:
             sb.table("geo_audits").update({
                 "progress_current": completed,
                 "progress_message": (
-                    f"[{completed}/{total_count}] {engine_display} — "
+                    f"[{completed}/{total_count}] {engine_display}: "
                     f"Prompt #{result.prompt_id}: {mention_str}"
                 ),
                 "updated_at": datetime.now(timezone.utc).isoformat(),
@@ -552,7 +552,7 @@ def run_audit_extension(audit_id: str, prompt_ids: list[int]) -> None:
 
     except Exception as exc:
         logger.exception(f"Extension {audit_id} failed: {exc}")
-        # Revert to completed — original data is still intact
+        # Revert to completed, original data is still intact
         sb.table("geo_audits").update({
             "status": "completed",
             "progress_message": f"Extension failed: {str(exc)[:200]}",

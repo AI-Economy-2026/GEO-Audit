@@ -461,7 +461,7 @@ Return ONLY a JSON object with no explanation, no markdown, no backticks:
 Rules:
 - "mentioned" = brand appears in any context
 - "recommended" = brand is actively suggested as a good option
-- Be strict about brand matching — "{brand}" should be matched exactly. Partial matches within other words are NOT matches.
+- Be strict about brand matching: "{brand}" should be matched exactly. Partial matches within other words are NOT matches.
 - If brand does not appear at all, return mentioned: false, 
   recommended: false, position: null, excerpt: null"""
 
@@ -795,7 +795,7 @@ def generate_summary_dict(
         if r.brand_mentioned:
             sentiment_counts[r.sentiment] = sentiment_counts.get(r.sentiment, 0) + 1
 
-    # Top cited domains — aggregate every URL the engines cited across all
+    # Top cited domains: aggregate every URL the engines cited across all
     # responses, normalise to bare domain (drop www.), then rank by share.
     # Mirrors the "Where do LLMs go for Answers?" infographic the client wants.
     from collections import Counter

@@ -6,7 +6,7 @@ httpx.RemoteProtocolError("Server disconnected"). To handle this:
 
 1. The client is refreshed every CLIENT_TTL_SECONDS so connections don't
    sit idle long enough to be killed by NAT / load balancers.
-2. reset_supabase() forces an immediate refresh — call after a network
+2. reset_supabase() forces an immediate refresh: call after a network
    error to drop the dead pool and reconnect.
 3. execute_with_retry() wraps .execute() calls so transient connection
    errors auto-retry with a fresh client instead of bubbling up and
@@ -81,7 +81,7 @@ def execute_with_retry(fn: Callable[[], T], max_retries: int = 3, op: str = "sup
     for attempt in range(1, max_retries + 1):
         try:
             return fn()
-        except Exception as exc:  # noqa: BLE001 — we genuinely need broad catch here
+        except Exception as exc:  # noqa: BLE001, we genuinely need broad catch here
             last_exc = exc
             msg = str(exc).lower()
             transient = any(marker in msg for marker in _TRANSIENT_MARKERS)
@@ -89,7 +89,7 @@ def execute_with_retry(fn: Callable[[], T], max_retries: int = 3, op: str = "sup
                 raise
             backoff = 0.5 * attempt
             logger.warning(
-                "%s transient error (attempt %d/%d): %s — retrying in %.1fs",
+                "%s transient error (attempt %d/%d): %s, retrying in %.1fs",
                 op,
                 attempt,
                 max_retries,

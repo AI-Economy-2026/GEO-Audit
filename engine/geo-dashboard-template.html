@@ -7,7 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700;9..40,800;9..40,900&family=Poppins:wght@300;400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
 <style>
 /* ============================================================
-   GEO AUDIT DASHBOARD — GATHA DESIGN SYSTEM
+   GEO AUDIT DASHBOARD (GATHA DESIGN SYSTEM)
    Gatha light: paper #F6F3EC, ink #0F1A2E, dark-mint #0F8A78, navy #172A52
    ============================================================ */
 :root{--blue:#0F8A78;--blue-light:#DFF3EF;--teal:#172A52;--teal-light:#E7ECF4;--dark:#0F1A2E;--g700:#3B4655;--g500:#6B7280;--g400:#9AA1AC;--g300:#D8D3C8;--g200:#EAE7E0;--g100:#F6F3EC;--g50:#FAF9F5;--white:#fff;--green:#1D9E75;--green-l:#E1F5EE;--orange:#A8641C;--orange-l:#FBEEDD;--red:#B4433A;--red-l:#F9E9E7;--mint:#0F8A78;--mint-bright:#5EEAD4}
@@ -1094,7 +1094,7 @@ function renderPrompts() {
       grid += '<span class="engine-name">' + eName + '</span>';
 
       if (eData.status === 'failed') {
-        grid += '<span style="color:#999; font-size:11px; font-weight:bold;">&mdash; Data unavailable</span>';
+        grid += '<span style="color:#999; font-size:11px; font-weight:bold;">Data unavailable</span>';
       } else if (eData.mentioned) {
         grid += '<span class="mention-check"><span role="img" aria-label="Mentioned">&#10003;</span> MENTIONED</span>';
       } else {

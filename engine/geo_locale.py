@@ -26,7 +26,7 @@ COUNTRY_LOCALE: dict[str, dict[str, str]] = {
     "Spain":                {"gl": "es", "hl": "es", "location": "Spain"},
 }
 
-# Engines that scrape live search results — they take the raw query, so the
+# Engines that scrape live search results: they take the raw query, so the
 # country is applied via search locale (gl/hl), NOT via a prompt prefix.
 SCRAPER_ENGINES = {"google_ai_mode", "google_ai_overview", "bing_copilot"}
 
