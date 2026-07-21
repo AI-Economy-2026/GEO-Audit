@@ -17,6 +17,8 @@ from datetime import datetime
 from pathlib import Path
 from statistics import mean
 
+from engine.text_clean import strip_em_dashes
+
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -320,7 +322,7 @@ class AuditAnalysis:
                 f"{best_cat['visibility']}% visibility. Expanding content in the "
                 f"{worst_cat['name']} category ({worst_cat['visibility']}%) presents the largest growth opportunity."
             )
-        self.findings = findings
+        self.findings = [strip_em_dashes(f) for f in findings]
 
     def _generate_recommendations(self):
         best_engine = max(self.engine_data, key=lambda e: e["rate"]) if self.engine_data else None
@@ -360,9 +362,9 @@ class AuditAnalysis:
         if best_engine:
             leverage.append(f"{best_engine['name']} at {best_engine['rate']}% shows the strongest engine affinity. Analyse {best_engine['name']}'s content preferences and replicate successful patterns across other engines.")
 
-        self.rec_priorities = priorities
-        self.rec_sector = sector
-        self.rec_leverage = leverage
+        self.rec_priorities = [strip_em_dashes(p) for p in priorities]
+        self.rec_sector = [strip_em_dashes(s) for s in sector]
+        self.rec_leverage = [strip_em_dashes(l) for l in leverage]
 
     def generate_executive_summary(self) -> str:
         cat_names = ", ".join(self.categories[:-1])
@@ -375,12 +377,12 @@ class AuditAnalysis:
             engine_names += f", and {self.engines[-1]}"
         elif self.engines:
             engine_names = self.engines[0]
-        return (
+        return strip_em_dashes(
             f"This comprehensive audit analyses {self.client_name}'s "
             f"visibility across {self.total_prompts} search prompts spanning "
             f"{len(self.categories)} categories: {cat_names}. Testing was "
             f"conducted across {len(self.engines)} leading AI engines "
-            f"— {engine_names} — to measure how frequently "
+            f"({engine_names}) to measure how frequently "
             f"{self.client_name} is surfaced in generative AI responses to "
             f"queries that real buyers and decision-makers would use."
         )

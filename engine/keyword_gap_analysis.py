@@ -112,7 +112,7 @@ def analyse_keyword_gaps(
                 "prompt_id": pm["prompt_id"],
                 "prompt_text": pm["prompt_text"],
                 "category": pm["category"],
-                "opportunity": "No brands mentioned — easy win with targeted content",
+                "opportunity": "No brands mentioned, an easy win with targeted content",
             })
 
     # --- Keyword Frequency: common terms in AI responses ---

@@ -10,6 +10,8 @@ to create blogs, FAQ pages, comparison articles, and directory listings.
 
 from __future__ import annotations
 
+from engine.text_clean import strip_em_dashes
+
 CONTENT_TYPES = [
     "blog_post",
     "faq_page",
@@ -121,7 +123,7 @@ def generate_alice_brief(
         else:
             # General gap — blog post
             content_type = "blog_post"
-            title = f"Complete Guide to {gap['category']} — {brand}"
+            title = f"Complete Guide to {gap['category']} by {brand}"
             outline = [
                 f"Address the query: '{gap['prompt_text'][:60]}'",
                 f"Position {brand} as an authority in {gap['category']}",
@@ -133,19 +135,19 @@ def generate_alice_brief(
         content_recommendations.append({
             "id": rec_id,
             "type": content_type,
-            "title": title,
+            "title": strip_em_dashes(title),
             "target_query": gap["prompt_text"],
             "target_category": gap["category"],
             "priority_score": priority_score,
             "severity": severity,
-            "rationale": (
+            "rationale": strip_em_dashes(
                 f"Brand is missing from {n_missed}/{n_tested} engines for this query. "
                 + (f"Competitors {', '.join(competitors_present)} are being cited instead." if competitors_present
-                   else "No competitors mentioned either — opportunity for first-mover advantage.")
+                   else "No competitors mentioned either, an opportunity for first-mover advantage.")
             ),
             "target_engines": gap.get("engines_missed", []),
             "competitors_to_beat": competitors_present,
-            "suggested_outline": outline,
+            "suggested_outline": [strip_em_dashes(o) for o in outline],
         })
         rec_id += 1
 
@@ -157,16 +159,16 @@ def generate_alice_brief(
         content_recommendations.append({
             "id": rec_id,
             "type": "blog_post",
-            "title": f"{brand}'s Approach to {opp['category']}",
+            "title": strip_em_dashes(f"{brand}'s Approach to {opp['category']}"),
             "target_query": opp["prompt_text"],
             "target_category": opp["category"],
             "priority_score": 30,  # Medium priority — easy win
             "severity": "opportunity",
-            "rationale": "No brands mentioned for this query — first-mover advantage.",
+            "rationale": "No brands mentioned for this query, a first-mover advantage.",
             "target_engines": [],
             "competitors_to_beat": [],
             "suggested_outline": [
-                f"Create authoritative content answering: '{opp['prompt_text'][:60]}'",
+                strip_em_dashes(f"Create authoritative content answering: '{opp['prompt_text'][:60]}'"),
                 "Include industry data and expert opinions",
                 "Add structured data for AI engine discoverability",
                 "Publish on high-authority third-party sites as well",
@@ -193,12 +195,12 @@ def generate_alice_brief(
             "current_link": d.get("link"),
             "action": action,
             "urgency": urgency,
-            "recommendation": (
+            "recommendation": strip_em_dashes(
                 f"Optimise your existing {d['directory']} listing with updated info and keywords."
                 if action == "optimise"
                 else f"Claim your {d['directory']} listing to improve AI engine citations."
                 if action == "claim"
-                else f"Manually check {d['directory']} — automated check failed."
+                else f"Manually check {d['directory']}, the automated check failed."
             ),
         })
 

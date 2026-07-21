@@ -2,6 +2,7 @@ import json
 import logging
 from openai import OpenAI
 from app.config import OPENAI_API_KEY
+from engine.text_clean import strip_em_dashes
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +27,8 @@ def generate_wizard_prompts(brand_name: str, brand_url: str, competitors: list[s
     2. "Ranking Prompts" (Generate exactly 10): Broader category or comparison searches to see how the brand stacks up against competitors.
        Example: "Top 10 family lawyers in Victoria" or "Compare Deloitte and PwC for tax advisory."
 
+    Do not use em dashes; use commas or full stops instead.
+
     Return EXACTLY a valid JSON object with the following schema, and NO other markdown or text:
     {{
       "intent_prompts": ["prompt 1", "prompt 2", "prompt 3", "prompt 4", "prompt 5"],
@@ -48,7 +51,12 @@ def generate_wizard_prompts(brand_name: str, brand_url: str, competitors: list[s
         if not content:
             raise ValueError("No content returned from OpenAI")
             
-        return json.loads(content)
+        data = json.loads(content)
+        # Sanitize client-facing generated prompt strings
+        for key in ("intent_prompts", "ranking_prompts"):
+            if isinstance(data.get(key), list):
+                data[key] = [strip_em_dashes(p) if isinstance(p, str) else p for p in data[key]]
+        return data
     except Exception as e:
         logger.error(f"Error generating wizard prompts: {e}")
         # Return fallback generic prompts if the API fails
