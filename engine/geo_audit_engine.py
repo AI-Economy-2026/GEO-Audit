@@ -72,7 +72,7 @@ ENGINE_DISPLAY_NAMES = {
 
 ENGINE_MODELS = {
     "openai": "gpt-4o",
-    "anthropic": "claude-sonnet-4-20250514",
+    "anthropic": "claude-sonnet-4-6",
     "google": "gemini-2.5-flash",
     "perplexity": "sonar-pro",
     "xai": "grok-3",
