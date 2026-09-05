@@ -15,7 +15,7 @@ from contextlib import asynccontextmanager
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
-from fastapi import BackgroundTasks, FastAPI, Header, HTTPException
+from fastapi import BackgroundTasks, FastAPI, Header, HTTPException, Request
 from pydantic import BaseModel
 
 import os
@@ -23,8 +23,11 @@ import sys
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
+import stripe
+
 from .config import WORKER_API_KEY
 from .worker import run_audit_task, run_audit_extension
+from . import billing
 from engine.generate_prompts import generate_wizard_prompts
 
 logging.basicConfig(level=logging.INFO)
@@ -82,6 +85,18 @@ class HealthResponse(BaseModel):
 class AuditStartResponse(BaseModel):
     status: str
     audit_id: str
+
+
+class CheckoutRequest(BaseModel):
+    user_id: str
+    product_type: str
+    product_id: str
+    success_url: str
+    cancel_url: str
+
+
+class CheckoutResponse(BaseModel):
+    url: str
 
 
 @app.get("/api/health", response_model=HealthResponse)
@@ -290,3 +305,69 @@ async def extend_audit(
     logger.info(f"Received extend request: {req.audit_id}, prompts: {req.prompt_ids}")
     background_tasks.add_task(run_audit_extension, req.audit_id, req.prompt_ids)
     return AuditStartResponse(status="accepted", audit_id=req.audit_id)
+
+
+@app.post("/api/checkout", response_model=CheckoutResponse)
+async def create_checkout(
+    req: CheckoutRequest,
+    authorization: str = Header(...),
+):
+    """
+    Create a Stripe Checkout session and return its hosted URL.
+
+    Called by the Next.js app's /api/checkout proxy route, which has already
+    authenticated the browser session and supplies the resolved user_id.
+    Uses the same worker-auth Bearer scheme as /api/audits/start: Python
+    trusts the Next.js backend, not the browser.
+    """
+    api_key = os.environ.get("WORKER_API_KEY", "") or WORKER_API_KEY
+    expected = f"Bearer {api_key}"
+    if not api_key or authorization != expected:
+        raise HTTPException(status_code=401, detail="Invalid worker API key.")
+
+    try:
+        url = billing.create_checkout_session(
+            user_id=req.user_id,
+            product_type=req.product_type,
+            product_id=req.product_id,
+            success_url=req.success_url,
+            cancel_url=req.cancel_url,
+        )
+        return CheckoutResponse(url=url)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Failed to create checkout session: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/stripe/webhook")
+async def stripe_webhook(request: Request):
+    """
+    Stripe webhook receiver. Called directly by Stripe (or the `stripe
+    listen` CLI forwarder in local dev), NOT through the worker-auth Bearer
+    scheme. Verifies the Stripe webhook signature instead.
+    """
+    signature = request.headers.get("stripe-signature")
+    webhook_secret = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
+
+    if not signature or not webhook_secret:
+        raise HTTPException(status_code=500, detail="Webhook is not configured.")
+
+    payload = await request.body()
+
+    try:
+        event = stripe.Webhook.construct_event(payload, signature, webhook_secret)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Webhook signature verification failed: {e}")
+
+    try:
+        if event["type"] == "checkout.session.completed":
+            billing.fulfill_checkout_session(event)
+        if event["type"] == "customer.subscription.deleted":
+            billing.revoke_white_label_for_subscription(event["data"]["object"])
+    except Exception as e:
+        logger.error(f"Stripe webhook fulfillment failed for event {event['id']}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+    return {"received": True}

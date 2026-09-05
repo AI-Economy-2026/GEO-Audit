@@ -71,12 +71,16 @@ ENGINE_DISPLAY_NAMES = {
 }
 
 ENGINE_MODELS = {
-    "openai": "gpt-4o",
-    "anthropic": "claude-sonnet-4-6",
-    "google": "gemini-2.5-flash",
-    "perplexity": "sonar-pro",
-    "xai": "grok-3",
-    "deepseek": "deepseek-chat",
+    # All six of these are now routed through OpenRouter's unified API
+    # (base_url="https://openrouter.ai/api/v1"). The model slugs are
+    # OpenRouter's current vendor/model-name identifiers, confirmed against
+    # https://openrouter.ai/api/v1/models at the time of this migration.
+    "openai": "openai/gpt-5.1",
+    "anthropic": "anthropic/claude-opus-5",
+    "google": "google/gemini-3.1-pro-preview",
+    "perplexity": "perplexity/sonar-pro",
+    "xai": "x-ai/grok-4.6",
+    "deepseek": "deepseek/deepseek-v4-pro",
     "meta_llama": "Llama-4-Maverick-17B-128E-Instruct-FP8",
 }
 
@@ -160,115 +164,73 @@ ProgressCallback = Callable[[int, int, AuditResult], None]
 # )
 
 
-def query_openai(prompt_text: str) -> str:
-    print("prompt_text", prompt_text)
+# All six vendor-branded query_* functions below now route through
+# OpenRouter's single OpenAI-compatible endpoint instead of each vendor's
+# own SDK/base_url. The engine key strings ("openai", "anthropic", "google",
+# "perplexity", "xai", "deepseek") and each function's signature / return
+# type / "[ERROR] ..." exception-wrapping convention are unchanged, since
+# the rest of the app (frontend, DB rows, engine_breakdown) keys off those
+# exact names rather than the model actually used underneath.
+_OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+
+
+def _query_via_openrouter(model: str, prompt_text: str) -> str:
+    """Shared helper: call OpenRouter's OpenAI-compatible chat completions API."""
     if openai is None:
         raise ImportError("openai library is not installed.")
-    api_key = os.getenv("OPENAI_API_KEY")
+    api_key = os.getenv("OPENROUTER_API_KEY")
     if not api_key:
-        raise EnvironmentError("OPENAI_API_KEY is not set.")
-    client = openai.OpenAI(api_key=api_key)
+        raise EnvironmentError("OPENROUTER_API_KEY is not set.")
+    client = openai.OpenAI(api_key=api_key, base_url=_OPENROUTER_BASE_URL)
     response = client.chat.completions.create(
-        model=ENGINE_MODELS["openai"],
+        model=model,
         messages=[{"role": "user", "content": prompt_text}],
         temperature=0.2,
         max_tokens=2048,
     )
-    print("response by openai", response)
     return response.choices[0].message.content or ""
+
+
+def query_openai(prompt_text: str) -> str:
+    print("prompt_text", prompt_text)
+    response = _query_via_openrouter(ENGINE_MODELS["openai"], prompt_text)
+    print("response by openai", response)
+    return response
 
 
 
 def query_anthropic(prompt_text: str) -> str:
-    if anthropic is None:
-        raise ImportError("anthropic library is not installed.")
-    api_key = os.getenv("ANTHROPIC_API_KEY")
-    if not api_key:
-        raise EnvironmentError("ANTHROPIC_API_KEY is not set.")
-    client = anthropic.Anthropic(api_key=api_key)
-    message = client.messages.create(
-        model=ENGINE_MODELS["anthropic"],
-        max_tokens=2048,
-        messages=[{"role": "user", "content": prompt_text}],
-    )
-    print("response by anthropic", message)
-    return "".join(
-        block.text for block in message.content if hasattr(block, "text")
-    )
+    response = _query_via_openrouter(ENGINE_MODELS["anthropic"], prompt_text)
+    print("response by anthropic", response)
+    return response
 
 
 
 def query_google(prompt_text: str) -> str:
-    import urllib.request
-    import urllib.error
-
-    api_key = os.getenv("GOOGLE_API_KEY")
-    if not api_key:
-        raise EnvironmentError("GOOGLE_API_KEY is not set.")
-    model = ENGINE_MODELS["google"]
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
-    payload = json.dumps({
-        "contents": [{"parts": [{"text": prompt_text}]}],
-        "generationConfig": {"temperature": 0.2, "maxOutputTokens": 2048},
-    }).encode("utf-8")
-    req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json"})
-    with urllib.request.urlopen(req) as resp:
-        result = json.loads(resp.read().decode("utf-8"))
-    return result["candidates"][0]["content"]["parts"][0]["text"]
+    response = _query_via_openrouter(ENGINE_MODELS["google"], prompt_text)
+    print("response by google", response)
+    return response
 
 
 
 def query_perplexity(prompt_text: str) -> str:
-    if openai is None:
-        raise ImportError("openai library is not installed.")
-    api_key = os.getenv("PERPLEXITY_API_KEY")
-    if not api_key:
-        raise EnvironmentError("PERPLEXITY_API_KEY is not set.")
-    client = openai.OpenAI(api_key=api_key, base_url="https://api.perplexity.ai")
-    response = client.chat.completions.create(
-        model=ENGINE_MODELS["perplexity"],
-        messages=[{"role": "user", "content": prompt_text}],
-        temperature=0.2,
-        max_tokens=2048,
-    )
+    response = _query_via_openrouter(ENGINE_MODELS["perplexity"], prompt_text)
     print("response by perplexity", response)
-    return response.choices[0].message.content or ""
+    return response
 
 
 
 def query_xai(prompt_text: str) -> str:
-    if openai is None:
-        raise ImportError("openai library is not installed.")
-    api_key = os.getenv("XAI_API_KEY")
-    if not api_key:
-        raise EnvironmentError("XAI_API_KEY is not set.")
-    client = openai.OpenAI(api_key=api_key, base_url="https://api.x.ai/v1")
-    response = client.chat.completions.create(
-        model=ENGINE_MODELS["xai"],
-        messages=[{"role": "user", "content": prompt_text}],
-        temperature=0.2,
-        max_tokens=2048,
-    )
+    response = _query_via_openrouter(ENGINE_MODELS["xai"], prompt_text)
     print("response by xai", response)
-    return response.choices[0].message.content or ""
+    return response
 
 
 
 def query_deepseek(prompt_text: str) -> str:
-    if openai is None:
-        raise ImportError("openai library is not installed.")
-    api_key = os.getenv("DEEPSEEK_API_KEY")
-    if not api_key:
-        raise EnvironmentError("DEEPSEEK_API_KEY is not set.")
-    client = openai.OpenAI(api_key=api_key, base_url="https://api.deepseek.com")
-    response = client.chat.completions.create(
-        model=ENGINE_MODELS["deepseek"],
-        messages=[{"role": "user", "content": prompt_text}],
-        temperature=0.2,
-        max_tokens=2048,
-    )
+    response = _query_via_openrouter(ENGINE_MODELS["deepseek"], prompt_text)
     print("response by deepseek", response)
-    return response.choices[0].message.content or ""
+    return response
 
 
 
