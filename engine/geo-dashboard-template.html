@@ -830,14 +830,28 @@ h3 {
 <!-- ============================================================
      DATA & JAVASCRIPT
      ============================================================ -->
+<!-- DATA (injected by generate_dashboard.py). Held as inert JSON rather than
+     as executable JavaScript, and parsed below. -->
+<script id="dashboardData" type="application/json">{{DASHBOARD_DATA}}</script>
 <script>
-// --- DATA (injected by generate_dashboard.py) ---
-var ENGINE_DATA = {{ENGINE_DATA}};
-var PROMPT_DATA = {{PROMPT_DATA}};
-var CATEGORY_RANKINGS = {{CATEGORY_RANKINGS}};
-var CATEGORY_PERF = {{CATEGORY_PERF}};
-var CLIENT_NAME = "{{CLIENT_NAME}}";
-var KEYWORDS = {{KEYWORDS_JSON}};
+var DASHBOARD_DATA = JSON.parse(document.getElementById('dashboardData').textContent);
+var ENGINE_DATA = DASHBOARD_DATA.engineData || [];
+var PROMPT_DATA = DASHBOARD_DATA.promptData || [];
+var CATEGORY_RANKINGS = DASHBOARD_DATA.categoryRankings || [];
+var CATEGORY_PERF = DASHBOARD_DATA.categoryPerf || [];
+var CLIENT_NAME = DASHBOARD_DATA.clientName || '';
+var KEYWORDS = DASHBOARD_DATA.keywords || [];
+
+// Every value above is engine- or client-controlled text, so it is escaped
+// before being concatenated into any innerHTML below.
+function escHtml(value) {
+  return String(value === null || value === undefined ? '' : value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
 // Render Keywords
 (function renderKeywords() {
@@ -848,7 +862,7 @@ var KEYWORDS = {{KEYWORDS_JSON}};
     return;
   }
   KEYWORDS.forEach(function(kw) {
-    container.innerHTML += '<span class="keyword-pill">' + kw + '</span>';
+    container.innerHTML += '<span class="keyword-pill">' + escHtml(kw) + '</span>';
   });
 })();
 
@@ -879,7 +893,7 @@ var KEYWORDS = {{KEYWORDS_JSON}};
       var rowClass = b.isClient ? ' class="client-row"' : '';
       tbody += '<tr' + rowClass + '>';
       tbody += '<td><span class="rank-badge">#' + b.rank + '</span></td>';
-      tbody += '<td><strong>' + b.brand + '</strong></td>';
+      tbody += '<td><strong>' + escHtml(b.brand) + '</strong></td>';
       tbody += '<td>' + b.mentions + '</td>';
       tbody += '<td><div class="share-bar-container"><div class="share-bar"><div class="share-fill" style="width:' + Math.min(b.sov, 100) + '%"></div></div><span class="share-text">' + b.sov + '%</span></div></td>';
       tbody += '</tr>';
@@ -907,7 +921,7 @@ var KEYWORDS = {{KEYWORDS_JSON}};
   var strongEl = document.getElementById('strongEngines');
   strong.forEach(function(e) {
     strongEl.innerHTML += '<div class="perf-card strong">' +
-      '<div class="perf-engine">' + e.name + '</div>' +
+      '<div class="perf-engine">' + escHtml(e.name) + '</div>' +
       '<div class="perf-value">' + e.rate + '%</div>' +
       '<div class="perf-label">Mention Rate</div>' +
       '<div class="perf-detail">' + e.mentioned + ' of ' + e.total + ' queries</div>' +
@@ -917,7 +931,7 @@ var KEYWORDS = {{KEYWORDS_JSON}};
   var gapEl = document.getElementById('gapEngines');
   gaps.forEach(function(e) {
     gapEl.innerHTML += '<div class="perf-card gap">' +
-      '<div class="perf-engine">' + e.name + '</div>' +
+      '<div class="perf-engine">' + escHtml(e.name) + '</div>' +
       '<div class="perf-value">' + e.gap + '%</div>' +
       '<div class="perf-label">Gap</div>' +
       '<div class="perf-detail">' + e.missed + ' missed opportunities</div>' +
@@ -934,7 +948,7 @@ var KEYWORDS = {{KEYWORDS_JSON}};
     else if (e.gap >= 30) { priority = 'medium'; label = 'Medium'; }
 
     tbody.innerHTML += '<tr>' +
-      '<td><strong>' + e.name + '</strong></td>' +
+      '<td><strong>' + escHtml(e.name) + '</strong></td>' +
       '<td>' + e.total + '</td>' +
       '<td>' + e.mentioned + '</td>' +
       '<td>' + e.rate + '%</td>' +
@@ -961,7 +975,7 @@ var KEYWORDS = {{KEYWORDS_JSON}};
     else if (cat.visibility >= 35) fillClass = 'med';
 
     container.innerHTML += '<div class="cat-perf-bar">' +
-      '<div class="cat-perf-label">' + cat.name + '</div>' +
+      '<div class="cat-perf-label">' + escHtml(cat.name) + '</div>' +
       '<div class="cat-perf-track"><div class="cat-perf-fill ' + fillClass + '" style="width:' + cat.visibility + '%"></div></div>' +
       '<div class="cat-perf-pct">' + cat.visibility + '%</div>' +
       '</div>';
@@ -1066,13 +1080,13 @@ function renderPrompts() {
     var header = '<div class="prompt-header">';
     header += '<div class="prompt-left">';
     header += '<span class="prompt-number">' + String(p.id).padStart(2, '0') + '</span>';
-    header += '<span class="status-badge" style="background:#e0e0e0; color:#333; font-size:10px;">' + (p.type || 'RANKING') + '</span>';
-    header += '<span class="prompt-text">' + p.prompt + '</span>';
+    header += '<span class="status-badge" style="background:#e0e0e0; color:#333; font-size:10px;">' + escHtml(p.type || 'RANKING') + '</span>';
+    header += '<span class="prompt-text">' + escHtml(p.prompt) + '</span>';
     header += '</div>';
     header += '<div class="prompt-right">';
 
     if (hasMention) {
-      header += '<span class="status-badge mentioned"><span role="img" aria-label="Mentioned">&#10003;</span> ' + CLIENT_NAME + ' Mentioned</span>';
+      header += '<span class="status-badge mentioned"><span role="img" aria-label="Mentioned">&#10003;</span> ' + escHtml(CLIENT_NAME) + ' Mentioned</span>';
     } else {
       header += '<span class="status-badge not-mentioned"><span role="img" aria-label="Not mentioned">&#10007;</span> Not Mentioned</span>';
     }
@@ -1084,14 +1098,16 @@ function renderPrompts() {
     header += '</div></div>';
 
     var grid = '<div class="engines-grid">';
-    engineNames.forEach(function(eName) {
+    engineNames.forEach(function(eName, eIndex) {
       var eData = engines[eName];
       var isClickable = eData.mentioned && eData.status !== 'failed';
       var itemClass = isClickable ? 'engine-item has-mention' : 'engine-item';
-      var clickHandler = 'showMention(\'' + eName.replace(/'/g, "\\'") + '\', ' + JSON.stringify(p.prompt).replace(/"/g, '&quot;') + ', ' + JSON.stringify(eData.excerpt || '').replace(/"/g, '&quot;') + ')';
-      grid += '<div class="' + itemClass + '" ' +
-        (isClickable ? 'role="button" tabindex="0" aria-label="View ' + eName + ' mention detail" onclick="' + clickHandler + '" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();' + clickHandler + ';}"' : '') + '>';
-      grid += '<span class="engine-name">' + eName + '</span>';
+      // No handler is built out of the data itself: the element only carries
+      // its index, and the listener is attached from JS once the markup is in
+      // place (see below).
+      grid += '<div class="' + itemClass + '" data-engine-index="' + eIndex + '" ' +
+        (isClickable ? 'role="button" tabindex="0" aria-label="View ' + escHtml(eName) + ' mention detail"' : '') + '>';
+      grid += '<span class="engine-name">' + escHtml(eName) + '</span>';
 
       if (eData.status === 'failed') {
         grid += '<span style="color:#999; font-size:11px; font-weight:bold;">Data unavailable</span>';
@@ -1105,6 +1121,20 @@ function renderPrompts() {
     grid += '</div>';
 
     item.innerHTML = header + grid;
+
+    // Wire up the mention modal without ever putting data into an attribute.
+    item.querySelectorAll('.engine-item.has-mention').forEach(function(el) {
+      var eName = engineNames[Number(el.getAttribute('data-engine-index'))];
+      var eData = engines[eName] || {};
+      function open(e) {
+        e.stopPropagation();
+        showMention(eName, p.prompt, eData.excerpt || '');
+      }
+      el.addEventListener('click', open);
+      el.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(e); }
+      });
+    });
 
     // Toggle expand on click / keyboard
     function toggleExpand() {
@@ -1153,10 +1183,12 @@ function showMention(engine, prompt, excerpt) {
   var modal = document.getElementById('mentionModal');
   document.getElementById('modalTitle').textContent = engine + ': Mention Detail';
 
-  var body = '<div class="mention-number">Prompt: ' + prompt + '</div>';
+  var body = '<div class="mention-number">Prompt: ' + escHtml(prompt) + '</div>';
   if (excerpt && excerpt.length > 0) {
-    // Highlight client name in excerpt
-    var highlighted = excerpt.replace(new RegExp('(' + CLIENT_NAME.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi'), '<mark>$1</mark>');
+    // Escape first, then highlight the client name in the escaped text, so the
+    // only markup that reaches innerHTML is the <mark> wrapper we add here.
+    var needle = escHtml(CLIENT_NAME).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    var highlighted = escHtml(excerpt).replace(new RegExp('(' + needle + ')', 'gi'), '<mark>$1</mark>');
     body += '<div class="mention-item">' + highlighted + '</div>';
   } else {
     body += '<div class="no-mentions">No excerpt available for this mention.</div>';

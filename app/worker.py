@@ -28,6 +28,7 @@ from engine.geo_audit_engine import (
     ENGINE_DISPLAY_NAMES,
     Prompt,
     generate_summary_dict,
+    normalise_sentiment,
     run_audit_async,
 )
 from engine.prompt_classifier import classify_prompt_type, classify_intent_type
@@ -145,7 +146,9 @@ def run_audit_task(audit_id: str) -> None:
                 "position_rank": result.position_rank,
                 "url_cited": result.url_cited,
                 "competitor_mentions": result.competitor_mentions,
-                "sentiment": result.sentiment,
+                # Validated against the geo_audit_results CHECK so an odd
+                # value cannot fail this insert (and with it the whole run).
+                "sentiment": normalise_sentiment(result.sentiment),
                 "response_text": result.response_text[:10000],  # cap at 10k chars
                 # Persist every URL parsed from the LLM response so the
                 # dashboard can build a "top-cited domains" view.
@@ -258,7 +261,7 @@ def run_audit_task(audit_id: str) -> None:
                 "status": "pending",
             }).execute()
         except Exception as brief_exc:
-            logger.warning(f"Failed to insert Alice brief (table may not exist): {brief_exc}")
+            _record_brief_failure(sb, audit_id, params["brand_name"], alice_brief, brief_exc)
 
         # 5. Generate dashboard HTML
         dashboard_html = render_dashboard_from_data(
@@ -387,7 +390,7 @@ def run_audit_extension(audit_id: str, prompt_ids: list[int]) -> None:
                 "position_rank": result.position_rank,
                 "url_cited": result.url_cited,
                 "competitor_mentions": result.competitor_mentions,
-                "sentiment": result.sentiment,
+                "sentiment": normalise_sentiment(result.sentiment),
                 "response_text": result.response_text[:10000],
             }
             sb.table("geo_audit_results").insert(row_data).execute()
@@ -514,7 +517,7 @@ def run_audit_extension(audit_id: str, prompt_ids: list[int]) -> None:
                 "status": "pending",
             }).execute()
         except Exception as brief_exc:
-            logger.warning(f"Failed to insert Alice brief: {brief_exc}")
+            _record_brief_failure(sb, audit_id, params["brand_name"], alice_brief, brief_exc)
 
         # Regenerate dashboard HTML
         dashboard_html = render_dashboard_from_data(
@@ -558,6 +561,34 @@ def run_audit_extension(audit_id: str, prompt_ids: list[int]) -> None:
             "progress_message": f"Extension failed: {str(exc)[:200]}",
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }).eq("id", audit_id).execute()
+
+
+def _record_brief_failure(sb, audit_id: str, brand_name: str, alice_brief, exc: Exception) -> None:
+    """Log and persist a failed geo_alice_briefs insert.
+
+    Not fatal to the audit itself, so the run is still allowed to complete, but
+    it must not vanish: the brief is what Agent Alice reads, so a swallowed
+    failure looks like a finished audit that silently has no content
+    recommendations. Recorded on geo_audits.error_message, the same column
+    _mark_failed() uses, without touching `status`.
+    """
+    logger.exception(
+        "Audit %s: failed to insert Alice brief into geo_alice_briefs "
+        "(brand=%s, brief_type=%s, brief_size=%d): %s",
+        audit_id, brand_name, type(alice_brief).__name__,
+        len(alice_brief or ""), exc,
+    )
+    message = f"Alice brief could not be saved: {exc}"
+    try:
+        sb.table("geo_audits").update({
+            "error_message": message[:2000],
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }).eq("id", audit_id).execute()
+    except Exception as update_exc:
+        logger.exception(
+            "Audit %s: could not record the Alice brief failure on the audit row: %s",
+            audit_id, update_exc,
+        )
 
 
 def _mark_failed(sb, audit_id: str, error_message: str) -> None:

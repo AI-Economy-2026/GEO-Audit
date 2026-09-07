@@ -12,6 +12,7 @@ import hmac
 import logging
 import smtplib
 import asyncio
+import uuid
 from contextlib import asynccontextmanager
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -33,6 +34,27 @@ from engine.generate_prompts import generate_wizard_prompts
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+def _opaque_error(
+    exc: Exception,
+    context: str,
+    status_code: int = 500,
+    message: str = "Internal server error.",
+) -> HTTPException:
+    """Log an exception against a short correlation id, return a safe error.
+
+    Exception text here can carry SMTP banners, upstream API payloads, stack
+    context and configuration detail, none of which belongs in a response
+    body. The caller gets only the reference so it can be quoted in a support
+    request and matched to the log line.
+    """
+    correlation_id = uuid.uuid4().hex[:12]
+    logger.exception("[%s] %s: %s", correlation_id, context, exc)
+    return HTTPException(
+        status_code=status_code,
+        detail=f"{message} Reference: {correlation_id}",
+    )
 
 
 @asynccontextmanager
@@ -234,8 +256,11 @@ async def send_invite(
         logger.info(f"Invite email sent to {req.email}")
         return {"ok": True}
     except Exception as e:
-        logger.error(f"Failed to send invite email to {req.email}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise _opaque_error(
+            e,
+            f"Failed to send invite email to {req.email}",
+            message="Could not send the invite email.",
+        )
 
 
 @app.post("/api/generate-prompts", response_model=GeneratePromptsResponse)
@@ -256,8 +281,11 @@ async def generate_prompts(
             ranking_prompts=result.get("ranking_prompts", [])
         )
     except Exception as e:
-        logger.error(f"Error generating prompts endpoint: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise _opaque_error(
+            e,
+            "Error generating prompts endpoint",
+            message="Could not generate prompts.",
+        )
 
 
 @app.post("/api/audits/start", response_model=AuditStartResponse)
@@ -317,8 +345,11 @@ async def create_checkout(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logger.error(f"Failed to create checkout session: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise _opaque_error(
+            e,
+            "Failed to create checkout session",
+            message="Could not create the checkout session.",
+        )
 
 
 @app.post("/api/stripe/webhook")
@@ -339,7 +370,12 @@ async def stripe_webhook(request: Request):
     try:
         event = stripe.Webhook.construct_event(payload, signature, webhook_secret)
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Webhook signature verification failed: {e}")
+        raise _opaque_error(
+            e,
+            "Stripe webhook signature verification failed",
+            status_code=400,
+            message="Webhook signature verification failed.",
+        )
 
     try:
         if event["type"] == "checkout.session.completed":
@@ -347,7 +383,10 @@ async def stripe_webhook(request: Request):
         if event["type"] == "customer.subscription.deleted":
             billing.revoke_white_label_for_subscription(event["data"]["object"])
     except Exception as e:
-        logger.error(f"Stripe webhook fulfillment failed for event {event['id']}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise _opaque_error(
+            e,
+            f"Stripe webhook fulfillment failed for event {event['id']}",
+            message="Could not process the webhook event.",
+        )
 
     return {"received": True}

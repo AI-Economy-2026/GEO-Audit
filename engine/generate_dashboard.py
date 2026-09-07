@@ -9,6 +9,7 @@ Added: render_dashboard_from_data() that accepts list-of-dicts and returns HTML 
 
 from __future__ import annotations
 
+import html
 import json
 import logging
 import os
@@ -415,6 +416,41 @@ def _build_competitor_data(analysis: AuditAnalysis) -> list[dict]:
     return result
 
 
+# Template placeholders look like {{SOME_KEY}}. Substituting in a single pass
+# means an already-escaped value that happens to contain a placeholder-looking
+# string is never expanded a second time.
+_PLACEHOLDER_RE = re.compile(r"\{\{([A-Z0-9_]+)\}\}")
+
+
+def _esc(value) -> str:
+    """Escape a value for interpolation into an HTML text/attribute context."""
+    return html.escape(str(value), quote=True)
+
+
+def _json_for_script(payload) -> str:
+    """Serialise to JSON that is safe to embed inside a <script> element.
+
+    `<`, `>` and `&` are written as unicode escapes, so the payload can never
+    close the script element or be re-read as markup by the HTML parser. The
+    result is still valid JSON, so JSON.parse() gives back the original text.
+    """
+    return (
+        json.dumps(payload)
+        .replace("<", "\\u003c")
+        .replace(">", "\\u003e")
+        .replace("&", "\\u0026")
+    )
+
+
+def _substitute(doc: str, values: dict[str, str]) -> str:
+    """Replace every known {{KEY}} in one pass, leaving unknown keys alone."""
+    def _replace(match: re.Match) -> str:
+        key = match.group(1)
+        return values[key] if key in values else match.group(0)
+
+    return _PLACEHOLDER_RE.sub(_replace, doc)
+
+
 def _build_replacements(analysis: AuditAnalysis) -> dict[str, str]:
     now = datetime.now()
     today = f"{now.day} {now.strftime('%B %Y')}"
@@ -470,7 +506,6 @@ def _build_replacements(analysis: AuditAnalysis) -> dict[str, str]:
         r[f"REC_LEVERAGE_{i}"] = rec
     for i in range(len(analysis.rec_leverage) + 1, 4):
         r[f"REC_LEVERAGE_{i}"] = "Further analysis needed."
-    r["KEYWORDS_JSON"] = json.dumps(analysis.keywords)
     return r
 
 
@@ -480,34 +515,38 @@ def render_dashboard_html(
 ) -> str:
     """Read template and return rendered HTML string."""
     with open(template_path, encoding="utf-8") as fh:
-        html = fh.read()
+        doc = fh.read()
 
-    replacements = _build_replacements(analysis)
-    logger.debug("dashboard replacements built keys=%d", len(replacements))
-    for key, value in replacements.items():
-        html = html.replace("{{" + key + "}}", str(value))
+    # Every text placeholder is engine- or client-controlled, so it is HTML
+    # escaped exactly once on its way into the document.
+    values = {key: _esc(value) for key, value in _build_replacements(analysis).items()}
+    logger.debug("dashboard replacements built keys=%d", len(values))
 
-    engine_json = json.dumps([
-        {"name": e["name"], "icon": e["icon"], "rate": e["rate"],
-         "missed": e["missed"], "gap": e["gap"], "total": e["total"],
-         "mentioned": e["mentioned"]}
-        for e in analysis.engine_data
-    ], indent=2)
-    prompt_json = json.dumps(analysis.prompt_data, indent=2)
-    competitor_json = json.dumps(_build_competitor_data(analysis), indent=2)
-    cat_rankings_json = json.dumps(analysis.category_rankings, indent=2)
-    cat_perf_json = json.dumps([
-        {"name": c["name"], "visibility": c["visibility"], "sov": c["sov"]}
-        for c in analysis.category_data
-    ], indent=2)
+    # Structured data goes into a single <script type="application/json">
+    # block that the template parses client-side, instead of being pasted
+    # into executable JavaScript.
+    dashboard_data = {
+        "clientName": analysis.client_name,
+        "keywords": analysis.keywords,
+        "engineData": [
+            {"name": e["name"], "icon": e["icon"], "rate": e["rate"],
+             "missed": e["missed"], "gap": e["gap"], "total": e["total"],
+             "mentioned": e["mentioned"]}
+            for e in analysis.engine_data
+        ],
+        "promptData": analysis.prompt_data,
+        "competitorData": _build_competitor_data(analysis),
+        "categoryRankings": analysis.category_rankings,
+        "categoryPerf": [
+            {"name": c["name"], "visibility": c["visibility"], "sov": c["sov"]}
+            for c in analysis.category_data
+        ],
+    }
+    values["DASHBOARD_DATA"] = _json_for_script(dashboard_data)
 
-    html = html.replace("{{ENGINE_DATA}}", engine_json)
-    html = html.replace("{{PROMPT_DATA}}", prompt_json)
-    html = html.replace("{{COMPETITOR_DATA}}", competitor_json)
-    html = html.replace("{{CATEGORY_RANKINGS}}", cat_rankings_json)
-    html = html.replace("{{CATEGORY_PERF}}", cat_perf_json)
-    logger.debug("dashboard html rendered chars=%d", len(html))
-    return html
+    doc = _substitute(doc, values)
+    logger.debug("dashboard html rendered chars=%d", len(doc))
+    return doc
 
 
 # ---------------------------------------------------------------------------
