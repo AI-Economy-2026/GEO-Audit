@@ -10,6 +10,7 @@ Added: render_dashboard_from_data() that accepts list-of-dicts and returns HTML 
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 from collections import Counter
@@ -18,6 +19,8 @@ from pathlib import Path
 from statistics import mean
 
 from engine.text_clean import strip_em_dashes
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -480,7 +483,7 @@ def render_dashboard_html(
         html = fh.read()
 
     replacements = _build_replacements(analysis)
-    print("Replacement", replacements)
+    logger.debug("dashboard replacements built keys=%d", len(replacements))
     for key, value in replacements.items():
         html = html.replace("{{" + key + "}}", str(value))
 
@@ -503,7 +506,7 @@ def render_dashboard_html(
     html = html.replace("{{COMPETITOR_DATA}}", competitor_json)
     html = html.replace("{{CATEGORY_RANKINGS}}", cat_rankings_json)
     html = html.replace("{{CATEGORY_PERF}}", cat_perf_json)
-    print("RETURNING HTML FROM GENERATE DASHBOARD", html)
+    logger.debug("dashboard html rendered chars=%d", len(html))
     return html
 
 

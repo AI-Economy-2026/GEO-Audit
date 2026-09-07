@@ -248,7 +248,7 @@ def run_audit_task(audit_id: str) -> None:
             competitors=params["competitors"],
         )
         summary["alice_brief"] = alice_brief
-        print("ALICE BRIEF", alice_brief)
+        logger.debug("alice brief generated audit_id=%s chars=%d", audit_id, len(alice_brief or ""))
         # Store Alice brief in dedicated table (for Agent Alice to query)
         try:
             sb.table("geo_alice_briefs").insert({
@@ -268,7 +268,7 @@ def run_audit_task(audit_id: str) -> None:
             template_path=TEMPLATE_PATH,
             keywords=params.get("keywords", []),
         )
-        print("Dashboard HTML", dashboard_html) 
+        logger.debug("dashboard html generated audit_id=%s chars=%d", audit_id, len(dashboard_html or ""))
 
         # 6. Upload to Supabase Storage (upsert to handle re-runs)
         filename = f"{audit_id}/dashboard.html"

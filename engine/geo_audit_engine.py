@@ -188,48 +188,45 @@ def _query_via_openrouter(model: str, prompt_text: str) -> str:
         temperature=0.2,
         max_tokens=2048,
     )
-    return response.choices[0].message.content or ""
+    text = response.choices[0].message.content or ""
+    # Log identifiers and sizes only. Prompt and answer text are tenant data
+    # and must not land in logs.
+    logger.debug("openrouter query ok model=%s chars=%d", model, len(text))
+    return text
 
 
 def query_openai(prompt_text: str) -> str:
-    print("prompt_text", prompt_text)
     response = _query_via_openrouter(ENGINE_MODELS["openai"], prompt_text)
-    print("response by openai", response)
     return response
 
 
 
 def query_anthropic(prompt_text: str) -> str:
     response = _query_via_openrouter(ENGINE_MODELS["anthropic"], prompt_text)
-    print("response by anthropic", response)
     return response
 
 
 
 def query_google(prompt_text: str) -> str:
     response = _query_via_openrouter(ENGINE_MODELS["google"], prompt_text)
-    print("response by google", response)
     return response
 
 
 
 def query_perplexity(prompt_text: str) -> str:
     response = _query_via_openrouter(ENGINE_MODELS["perplexity"], prompt_text)
-    print("response by perplexity", response)
     return response
 
 
 
 def query_xai(prompt_text: str) -> str:
     response = _query_via_openrouter(ENGINE_MODELS["xai"], prompt_text)
-    print("response by xai", response)
     return response
 
 
 
 def query_deepseek(prompt_text: str) -> str:
     response = _query_via_openrouter(ENGINE_MODELS["deepseek"], prompt_text)
-    print("response by deepseek", response)
     return response
 
 
@@ -247,7 +244,6 @@ def query_meta_llama(prompt_text: str) -> str:
         temperature=0.2,
         max_tokens=2048,
     )
-    print("response by query_meta_llama", response)
     return response.choices[0].message.content or ""
 
 

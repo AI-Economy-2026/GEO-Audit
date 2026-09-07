@@ -8,6 +8,7 @@ Endpoints:
 
 from __future__ import annotations
 
+import hmac
 import logging
 import smtplib
 import asyncio
@@ -15,7 +16,7 @@ from contextlib import asynccontextmanager
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
-from fastapi import BackgroundTasks, FastAPI, Header, HTTPException, Request
+from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException, Request
 from pydantic import BaseModel
 
 import os
@@ -97,6 +98,22 @@ class CheckoutRequest(BaseModel):
 
 class CheckoutResponse(BaseModel):
     url: str
+
+
+def require_worker_auth(authorization: str = Header(...)) -> None:
+    """Verify the shared worker secret on the Authorization header.
+
+    Read at request time so a redeployed env var is picked up without a
+    restart. Uses a constant-time comparison so a wrong key cannot be
+    recovered by timing the response.
+    """
+    api_key = os.environ.get("WORKER_API_KEY", "") or WORKER_API_KEY
+    if not api_key:
+        logger.error("WORKER_API_KEY is not configured; rejecting request.")
+        raise HTTPException(status_code=500, detail="Worker auth is not configured.")
+
+    if not hmac.compare_digest(authorization, f"Bearer {api_key}"):
+        raise HTTPException(status_code=401, detail="Invalid worker API key.")
 
 
 @app.get("/api/health", response_model=HealthResponse)
@@ -221,33 +238,12 @@ async def send_invite(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/api/debug-env")
-async def debug_env():
-    """Temporary: check which env vars are loaded."""
-    key = os.environ.get("WORKER_API_KEY", "")
-    sb_url = os.environ.get("SUPABASE_URL", "")
-    sb_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
-    return {
-        "worker_key_length": len(key),
-        "worker_key_first5": key[:5] if key else "EMPTY",
-        "supabase_url": sb_url[:40] if sb_url else "EMPTY",
-        "supabase_key_length": len(sb_key),
-        "supabase_key_first10": sb_key[:10] if sb_key else "EMPTY",
-        "supabase_key_last5": sb_key[-5:] if sb_key else "EMPTY",
-    }
-
-
 @app.post("/api/generate-prompts", response_model=GeneratePromptsResponse)
 async def generate_prompts(
     req: GeneratePromptsRequest,
-    authorization: str = Header(...)
+    _: None = Depends(require_worker_auth),
 ):
     """Generate 5 intent prompts and 10 ranking prompts using LLM"""
-    api_key = os.environ.get("WORKER_API_KEY", "") or WORKER_API_KEY
-    expected = f"Bearer {api_key}"
-    if not api_key or authorization != expected:
-        raise HTTPException(status_code=401, detail="Invalid worker API key.")
-
     try:
         result = generate_wizard_prompts(
             brand_name=req.brand_name,
@@ -268,7 +264,7 @@ async def generate_prompts(
 async def start_audit(
     req: AuditStartRequest,
     background_tasks: BackgroundTasks,
-    authorization: str = Header(...),
+    _: None = Depends(require_worker_auth),
 ):
     """
     Trigger a background audit task.
@@ -276,12 +272,6 @@ async def start_audit(
     The caller must provide a valid Bearer token matching WORKER_API_KEY.
     The audit_id must already exist in the geo_audits table.
     """
-    # Verify shared secret (read at request time to pick up Railway env vars)
-    api_key = os.environ.get("WORKER_API_KEY", "") or WORKER_API_KEY
-    expected = f"Bearer {api_key}"
-    if not api_key or authorization != expected:
-        raise HTTPException(status_code=401, detail="Invalid worker API key.")
-
     logger.info(f"Received audit start request: {req.audit_id}")
 
     # Launch background task
@@ -294,14 +284,9 @@ async def start_audit(
 async def extend_audit(
     req: AuditExtendRequest,
     background_tasks: BackgroundTasks,
-    authorization: str = Header(...),
+    _: None = Depends(require_worker_auth),
 ):
     """Run additional prompts for an existing audit (incremental extension)."""
-    api_key = os.environ.get("WORKER_API_KEY", "") or WORKER_API_KEY
-    expected = f"Bearer {api_key}"
-    if not api_key or authorization != expected:
-        raise HTTPException(status_code=401, detail="Invalid worker API key.")
-
     logger.info(f"Received extend request: {req.audit_id}, prompts: {req.prompt_ids}")
     background_tasks.add_task(run_audit_extension, req.audit_id, req.prompt_ids)
     return AuditStartResponse(status="accepted", audit_id=req.audit_id)
@@ -310,7 +295,7 @@ async def extend_audit(
 @app.post("/api/checkout", response_model=CheckoutResponse)
 async def create_checkout(
     req: CheckoutRequest,
-    authorization: str = Header(...),
+    _: None = Depends(require_worker_auth),
 ):
     """
     Create a Stripe Checkout session and return its hosted URL.
@@ -320,11 +305,6 @@ async def create_checkout(
     Uses the same worker-auth Bearer scheme as /api/audits/start: Python
     trusts the Next.js backend, not the browser.
     """
-    api_key = os.environ.get("WORKER_API_KEY", "") or WORKER_API_KEY
-    expected = f"Bearer {api_key}"
-    if not api_key or authorization != expected:
-        raise HTTPException(status_code=401, detail="Invalid worker API key.")
-
     try:
         url = billing.create_checkout_session(
             user_id=req.user_id,
