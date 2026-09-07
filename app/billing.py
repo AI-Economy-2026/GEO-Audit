@@ -50,6 +50,12 @@ WHITE_LABEL_ADDON: dict[str, Any] = {
     "amount_cents": 9900,
 }
 
+# Stripe Tax product tax code. Required on every line item once Stripe Tax is
+# active on the account, otherwise session creation is rejected. Defaults to
+# "General - Electronically Supplied Services", which is also the account-level
+# default Stripe reports for this account, and is overridable per environment.
+STRIPE_TAX_CODE = os.environ.get("STRIPE_TAX_CODE", "txcd_10000000")
+
 
 def _configure_stripe() -> None:
     """Read STRIPE_SECRET_KEY from env at call time (not import time) so this
@@ -89,7 +95,10 @@ def create_checkout_session(
                     "price_data": {
                         "currency": "usd",
                         "unit_amount": WHITE_LABEL_ADDON["amount_cents"],
-                        "product_data": {"name": WHITE_LABEL_ADDON["name"]},
+                        "product_data": {
+                            "name": WHITE_LABEL_ADDON["name"],
+                            "tax_code": STRIPE_TAX_CODE,
+                        },
                         "recurring": {"interval": "month"},
                     },
                     "quantity": 1,
@@ -109,7 +118,10 @@ def create_checkout_session(
                     "price_data": {
                         "currency": "usd",
                         "unit_amount": product["amount_cents"],
-                        "product_data": {"name": product["name"]},
+                        "product_data": {
+                            "name": product["name"],
+                            "tax_code": STRIPE_TAX_CODE,
+                        },
                     },
                     "quantity": 1,
                 }
