@@ -380,8 +380,28 @@ async def stripe_webhook(request: Request):
     try:
         if event["type"] == "checkout.session.completed":
             billing.fulfill_checkout_session(event)
-        if event["type"] == "customer.subscription.deleted":
-            billing.revoke_white_label_for_subscription(event["data"]["object"])
+        elif event["type"] == "checkout.session.async_payment_succeeded":
+            # A delayed-notification method (bank debit, some wallets) finally
+            # paid. completed fired earlier with payment_status unpaid and was
+            # skipped, so this is where that purchase actually gets fulfilled.
+            billing.fulfill_checkout_session(event)
+        elif event["type"] == "checkout.session.async_payment_failed":
+            logger.warning(
+                "Checkout session %s failed to pay after completing (event %s); nothing granted.",
+                event["data"]["object"].get("id") if hasattr(event["data"]["object"], "get") else "?",
+                event["id"],
+            )
+        elif event["type"] in ("charge.refunded", "charge.dispute.created"):
+            # No clawback exists: credits_remaining has a CHECK (>= 0) and the
+            # spend paths floor at zero, so a refund after the credits are
+            # spent cannot be represented. Surface it loudly so it is handled
+            # by hand rather than silently absorbed.
+            logger.error(
+                "MANUAL ACTION: Stripe %s received (event %s). Credits are not clawed back "
+                "automatically; adjust the agency's balance from the admin panel.",
+                event["type"],
+                event["id"],
+            )
     except Exception as e:
         raise _opaque_error(
             e,
