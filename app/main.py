@@ -238,12 +238,15 @@ def _send_invite_email(to: str, agency_name: str, password: str, login_url: str)
 @app.post("/api/send-invite")
 async def send_invite(
     req: SendInviteRequest,
-    authorization: str = Header(...),
+    _: None = Depends(require_worker_auth),
 ):
-    """Send a welcome email with login credentials to a newly created agency."""
-    api_key = os.environ.get("WORKER_API_KEY", "") or WORKER_API_KEY
-    if not api_key or authorization != f"Bearer {api_key}":
-        raise HTTPException(status_code=401, detail="Invalid worker API key.")
+    """Send a welcome email with login credentials to a newly created agency.
+
+    Auth goes through require_worker_auth like every other protected route.
+    This endpoint used to compare the header with `!=`, which leaks the key a
+    character at a time to anyone who can time the response, and it also
+    skipped the "key not configured" guard that returns 500 rather than 401.
+    """
 
     try:
         await asyncio.to_thread(
@@ -343,7 +346,15 @@ async def create_checkout(
         )
         return CheckoutResponse(url=url)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        # str(e) here comes from the billing layer and can name internal
+        # product identifiers and configuration state. Same treatment as
+        # every other error path: correlation id out, detail into the log.
+        raise _opaque_error(
+            e,
+            "Rejected checkout session request",
+            status_code=400,
+            message="That purchase could not be started.",
+        )
     except Exception as e:
         raise _opaque_error(
             e,
