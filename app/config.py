@@ -30,3 +30,11 @@ DEEPSEEK_API_KEY: str = os.environ.get("DEEPSEEK_API_KEY", "")
 META_LLAMA_API_KEY: str = os.environ.get("META_LLAMA_API_KEY", "")
 SERPAPI_API_KEY: str = os.environ.get("SERPAPI_API_KEY", "")
 OPENROUTER_API_KEY: str = os.environ.get("OPENROUTER_API_KEY", "")
+
+# DataForSEO (SEO add-on)
+DATAFORSEO_LOGIN: str = os.environ.get("DATAFORSEO_LOGIN", "")
+DATAFORSEO_PASSWORD: str = os.environ.get("DATAFORSEO_PASSWORD", "")
+
+# Google OAuth (GSC) — used by the Next.js app primarily; listed for ops parity
+GOOGLE_OAUTH_CLIENT_ID: str = os.environ.get("GOOGLE_OAUTH_CLIENT_ID", "")
+GOOGLE_OAUTH_CLIENT_SECRET: str = os.environ.get("GOOGLE_OAUTH_CLIENT_SECRET", "")

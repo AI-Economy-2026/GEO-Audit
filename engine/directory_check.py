@@ -2,85 +2,73 @@
 Directory & Citation Check
 ===========================
 Checks whether a brand is listed on key business directories.
-Uses SerpAPI site-specific searches as a reliable fallback.
+Uses the SERP provider factory (SerpAPI/SearchAPI).
 """
 
 from __future__ import annotations
 
-import json
 import logging
-import os
-import urllib.parse
-import urllib.request
-import urllib.error
 
-from engine.geo_locale import locale_for
+from engine.providers.serp import SerpCapability, get_serp_provider
 
 logger = logging.getLogger(__name__)
 
 DIRECTORIES = [
     {
         "name": "Google Business Profile",
-        "search_template": "site:google.com/maps \"{brand}\"",
+        "search_template": 'site:google.com/maps "{brand}"',
     },
     {
         "name": "Yelp",
-        "search_template": "site:yelp.com \"{brand}\"",
+        "search_template": 'site:yelp.com "{brand}"',
     },
     {
         "name": "Trustpilot",
-        "search_template": "site:trustpilot.com \"{brand}\"",
+        "search_template": 'site:trustpilot.com "{brand}"',
     },
     {
         "name": "G2",
-        "search_template": "site:g2.com \"{brand}\"",
+        "search_template": 'site:g2.com "{brand}"',
     },
     {
         "name": "Capterra",
-        "search_template": "site:capterra.com \"{brand}\"",
+        "search_template": 'site:capterra.com "{brand}"',
     },
     {
         "name": "Clutch",
-        "search_template": "site:clutch.co \"{brand}\"",
+        "search_template": 'site:clutch.co "{brand}"',
     },
     {
         "name": "LinkedIn",
-        "search_template": "site:linkedin.com/company \"{brand}\"",
+        "search_template": 'site:linkedin.com/company "{brand}"',
     },
 ]
 
 
 def check_directories(brand: str, country: str | None = None) -> list[dict]:
     """
-    Check whether the brand is listed on key directories via SerpAPI.
+    Check whether the brand is listed on key directories.
 
     Returns list of dicts: [{directory, listed, link, error}]
     """
-    api_key = os.getenv("SERPAPI_API_KEY")
-    if not api_key:
+    provider = get_serp_provider(SerpCapability.DIRECTORY)
+    if not provider.is_configured():
         return [
-            {"directory": d["name"], "listed": False, "link": None, "error": "SERPAPI_API_KEY not set"}
+            {
+                "directory": d["name"],
+                "listed": False,
+                "link": None,
+                "error": "SERPAPI_API_KEY not set",
+            }
             for d in DIRECTORIES
         ]
 
-    _loc = locale_for(country)
     results = []
     for directory in DIRECTORIES:
         query = directory["search_template"].replace("{brand}", brand)
         try:
-            params = urllib.parse.urlencode({
-                "engine": "google",
-                "q": query,
-                "api_key": api_key,
-                "num": 3,
-                **({"gl": _loc["gl"], "hl": _loc["hl"]} if _loc else {}),
-            })
-            url = f"https://www.searchapi.io/api/v1/search?{params}"
-            req = urllib.request.Request(url)
-            with urllib.request.urlopen(req, timeout=15) as resp:
-                data = json.loads(resp.read().decode("utf-8"))
-
-            organic = data.get("organic_results", [])
+            data = provider.directory_search(query, country=country, num=3)
+            organic = data.get("organic") or []
             if organic:
                 results.append({
                     "directory": directory["name"],
@@ -93,10 +81,10 @@ def check_directories(brand: str, country: str | None = None) -> list[dict]:
                     "directory": directory["name"],
                     "listed": False,
                     "link": None,
-                    "error": None,
+                    "error": data.get("error"),
                 })
-        except Exception as exc:
-            logger.warning(f"Directory check failed for {directory['name']}: {exc}")
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Directory check failed for %s: %s", directory["name"],exc)
             results.append({
                 "directory": directory["name"],
                 "listed": False,

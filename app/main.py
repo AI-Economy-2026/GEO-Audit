@@ -30,7 +30,11 @@ import stripe
 from .config import WORKER_API_KEY
 from .worker import run_audit_task, run_audit_extension
 from . import billing
+from .watches import tick_due_watches
+from .webhooks import deliver_event
 from engine.generate_prompts import generate_wizard_prompts
+from engine.providers.serp import SerpCapability, get_serp_provider, provider_status
+from engine.providers.serp._http import clean_domain
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -421,3 +425,78 @@ async def stripe_webhook(request: Request):
         )
 
     return {"received": True}
+
+
+class KeywordIdeasRequest(BaseModel):
+    brand_url: str
+    country: str | None = None
+    limit: int = 50
+
+
+@app.post("/api/seo/keyword-ideas")
+async def seo_keyword_ideas(
+    req: KeywordIdeasRequest,
+    _: None = Depends(require_worker_auth),
+):
+    """Return keyword ideas for a domain (DataForSEO when configured)."""
+    provider = get_serp_provider(SerpCapability.KEYWORD_IDEAS)
+    if not provider.is_configured():
+        raise HTTPException(
+            status_code=503,
+            detail="Keyword ideas are unavailable. DataForSEO is not configured.",
+        )
+    try:
+        data = provider.keyword_ideas(
+            clean_domain(req.brand_url),
+            country=req.country,
+            limit=min(max(req.limit, 1), 100),
+        )
+        if data.get("error") and data.get("error") != "provider_unavailable":
+            raise RuntimeError(data.get("error"))
+        return {
+            "keywords": data.get("keywords") or [],
+            "provider": data.get("provider"),
+            "providers": provider_status(),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise _opaque_error(e, "keyword-ideas failed", message="Could not load keyword ideas.")
+
+
+@app.post("/api/watches/tick")
+async def watches_tick(
+    background_tasks: BackgroundTasks,
+    _: None = Depends(require_worker_auth),
+):
+    """Cron entrypoint: process due Watch schedules."""
+    try:
+        # Run synchronously for cron reliability; each audit is already a full job.
+        result = tick_due_watches()
+        return {"status": "ok", **result}
+    except Exception as e:
+        raise _opaque_error(e, "watches tick failed", message="Could not process watches.")
+
+
+class DeliverWebhookRequest(BaseModel):
+    user_id: str
+    event: str
+    payload: dict
+
+
+@app.post("/api/webhooks/deliver")
+async def webhooks_deliver(
+    req: DeliverWebhookRequest,
+    _: None = Depends(require_worker_auth),
+):
+    try:
+        count = deliver_event(req.user_id, req.event, req.payload)
+        return {"delivered": count}
+    except Exception as e:
+        raise _opaque_error(e, "webhook deliver failed", message="Could not deliver webhooks.")
+
+
+@app.get("/api/providers/status")
+async def providers_status(_: None = Depends(require_worker_auth)):
+    return provider_status()
+

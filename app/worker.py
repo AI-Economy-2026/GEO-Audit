@@ -37,6 +37,7 @@ from engine.keyword_gap_analysis import analyse_keyword_gaps
 from engine.directory_check import check_directories
 from engine.serp_analysis import check_site_index, check_organic_rankings, compare_ai_vs_seo
 from engine.alice_brief_generator import generate_alice_brief
+from engine.seo import run_seo_modules
 
 logger = logging.getLogger(__name__)
 
@@ -235,6 +236,27 @@ def run_audit_task(audit_id: str) -> None:
             "summary": serp_comparison["summary"],
         }
 
+        # 4d2. Full SEO modules (entitlement-gated — never blocks GEO)
+        if params.get("seo_addon_enabled"):
+            logger.info("Audit %s: Running SEO add-on modules...", audit_id)
+            sb.table("geo_audits").update({
+                "progress_message": "Running Full SEO audit modules...",
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }).eq("id", audit_id).execute()
+            try:
+                summary["seo"] = run_seo_modules(
+                    brand_name=params["brand_name"],
+                    brand_url=params["brand_url"],
+                    competitors=params.get("competitors") or [],
+                    keywords=params.get("keywords") or [],
+                    country=params.get("country"),
+                    directory_results=directory_results,
+                    prompt_texts=[p.prompt_text for p in prompts],
+                )
+            except Exception as seo_exc:  # noqa: BLE001
+                logger.warning("SEO modules failed for %s: %s", audit_id, seo_exc)
+                summary["seo"] = {"error": "seo_modules_failed", "schema_version": 1}
+
         # 4e. Alice brief
         logger.info(f"Audit {audit_id}: Generating content recommendations...")
         sb.table("geo_audits").update({
@@ -303,6 +325,22 @@ def run_audit_task(audit_id: str) -> None:
             f"Audit {audit_id} completed in {elapsed}s. "
             f"Visibility: {summary['overall_visibility']['visibility_rate_percent']}%"
         )
+
+        # Outbound webhooks (best-effort)
+        try:
+            from .webhooks import deliver_event
+            deliver_event(
+                params.get("created_by") or "",
+                "audit.completed",
+                {
+                    "audit_id": audit_id,
+                    "brand_name": params.get("brand_name"),
+                    "visibility_rate": summary["overall_visibility"]["visibility_rate_percent"],
+                    "dashboard_url": dashboard_url,
+                },
+            )
+        except Exception:  # noqa: BLE001
+            logger.exception("Webhook delivery failed for audit %s", audit_id)
 
     except InterruptedError:
         logger.info(f"Audit {audit_id} was cancelled during execution.")

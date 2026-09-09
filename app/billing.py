@@ -49,6 +49,11 @@ BUNDLE_PACKS: dict[str, dict[str, Any]] = {
     "legendary": {"name": "Legendary Pack", "amount_cents": 59900, "credits": 25},
 }
 
+# One-off SEO add-on: grants seo_addon_credits (not audit credits).
+SEO_ADDONS: dict[str, dict[str, Any]] = {
+    "seo_full": {"name": "Full SEO Audit", "amount_cents": 4900, "seo_credits": 1},
+}
+
 # Stripe Tax product tax code. Required on every line item once Stripe Tax is
 # active on the account, otherwise session creation is rejected. Defaults to
 # "General - Electronically Supplied Services", which is also the account-level
@@ -67,6 +72,11 @@ def _configure_stripe() -> None:
 
 
 def _get_one_off_product(product_type: str, product_id: str) -> dict[str, Any]:
+    if product_type == "addon":
+        product = SEO_ADDONS.get(product_id)
+        if not product:
+            raise ValueError(f"Unknown addon product: {product_id}")
+        return product
     catalog = AUDIT_TIERS if product_type == "tier" else BUNDLE_PACKS
     product = catalog.get(product_id)
     if not product:
@@ -86,7 +96,7 @@ def create_checkout_session(
 
     metadata = {"user_id": user_id, "product_type": product_type, "product_id": product_id or ""}
 
-    if product_type in ("tier", "bundle"):
+    if product_type in ("tier", "bundle", "addon"):
         product = _get_one_off_product(product_type, product_id)
         session = stripe.checkout.Session.create(
             mode="payment",
@@ -113,6 +123,37 @@ def create_checkout_session(
     if not session.url:
         raise RuntimeError("Stripe did not return a checkout session URL")
     return session.url
+
+
+def _increment_seo_addon(user_id: str, credits: int = 1) -> None:
+    sb = get_supabase()
+    try:
+        execute_with_retry(
+            lambda: sb.rpc("grant_seo_addon", {"p_user_id": user_id, "p_credits": credits}).execute(),
+            op="rpc grant_seo_addon",
+        )
+        return
+    except Exception as exc:  # noqa: BLE001
+        msg = str(exc).lower()
+        if not ("grant_seo_addon" in msg and ("does not exist" in msg or "not find" in msg or "404" in msg)):
+            raise
+        logger.error("grant_seo_addon RPC missing; apply supabase/200_seo_addon.sql. Falling back to RMW.")
+
+    result = execute_with_retry(
+        lambda: sb.table("app_users").select("seo_addon_credits").eq("id", user_id).maybe_single().execute(),
+        op="fetch seo_addon_credits",
+    )
+    profile = result.data if result else None
+    if not profile:
+        raise RuntimeError(f"Cannot grant SEO addon, app_users row not found for {user_id}")
+    new_balance = (profile.get("seo_addon_credits") or 0) + credits
+    execute_with_retry(
+        lambda: sb.table("app_users")
+        .update({"seo_addon_credits": new_balance, "updated_at": datetime.now(timezone.utc).isoformat()})
+        .eq("id", user_id)
+        .execute(),
+        op="update seo_addon_credits",
+    )
 
 
 def _increment_credits(user_id: str, credits: int) -> None:
@@ -264,6 +305,7 @@ def fulfill_checkout_session(event: Any) -> None:
     # Resolve the product before writing anything, so an unrecognised product
     # never leaves a ledger row claiming credits it cannot describe.
     credits_to_grant = 0
+    seo_credits_to_grant = 0
     if product_type in ("tier", "bundle"):
         try:
             product = _get_one_off_product(product_type, product_id or "")
@@ -272,6 +314,14 @@ def fulfill_checkout_session(event: Any) -> None:
             _record_unfulfillable(sb, event_id, session_dict, f"unknown {product_type} product: {product_id}")
             return
         credits_to_grant = product["credits"]
+    elif product_type == "addon":
+        try:
+            product = _get_one_off_product(product_type, product_id or "")
+        except ValueError:
+            logger.error("Unknown addon product %r in event %s", product_id, event_id)
+            _record_unfulfillable(sb, event_id, session_dict, f"unknown addon product: {product_id}")
+            return
+        seo_credits_to_grant = int(product.get("seo_credits") or 1)
     else:
         logger.error("Unknown product type in checkout session metadata: %s", product_type)
         _record_unfulfillable(sb, event_id, session_dict, f"unknown product_type: {product_type}")
@@ -292,7 +342,7 @@ def fulfill_checkout_session(event: Any) -> None:
                     "product_type": product_type,
                     "product_id": product_id,
                     "amount_cents": session_dict.get("amount_total"),
-                    "credits_granted": credits_to_grant,
+                    "credits_granted": credits_to_grant if product_type != "addon" else seo_credits_to_grant,
                 }
             )
             .execute(),
@@ -304,6 +354,18 @@ def fulfill_checkout_session(event: Any) -> None:
             logger.info("Stripe event %s already fulfilled, skipping", event_id)
             return
         raise
+
+    if product_type == "addon":
+        _increment_seo_addon(user_id, seo_credits_to_grant)
+        logger.info(
+            "Fulfilled event %s: granted %d SEO add-on credit(s) to %s for %s/%s",
+            event_id,
+            seo_credits_to_grant,
+            user_id,
+            product_type,
+            product_id,
+        )
+        return
 
     # The row is ours, so this grant happens exactly once per Stripe event.
     _increment_credits(user_id, credits_to_grant)
