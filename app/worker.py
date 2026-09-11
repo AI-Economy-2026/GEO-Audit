@@ -48,6 +48,50 @@ logger = logging.getLogger(__name__)
 TEMPLATE_PATH = str(Path(__file__).resolve().parent.parent / "engine" / "geo-dashboard-template.html")
 
 
+def _log_audit_cost(sb, audit_id: str, user_id: str, summary: dict) -> None:
+    """Compute and store the API cost of an audit for the finance dashboard.
+
+    Reads cost-per-call estimates from config and derives a total cost in
+    cents from the audit summary. Never raises — failure is logged only.
+    """
+    from . import config as _cfg
+
+    # Pull usage stats from the summary if available. These are best-effort
+    # estimates; if the engine didn't populate them we default to 0.
+    seo = summary.get("seo") or {}
+    rankings = seo.get("rankings") or {}
+    backlinks = seo.get("backlinks") or {}
+    health = seo.get("site_health") or {}
+
+    serpapi_calls = len(rankings.get("results") or []) if isinstance(rankings.get("results"), list) else 0
+    dataforseo_calls = 0  # engine doesn't expose this yet
+    ai_input_tokens = summary.get("ai_input_tokens", 0)
+    ai_output_tokens = summary.get("ai_output_tokens", 0)
+    backlinks_calls = 1 if backlinks else 0
+    pages_crawled = (health.get("summary") or {}).get("pages_crawled", 0)
+
+    cost = (
+        serpapi_calls * _cfg.COST_PER_SERPAPI_CALL_CENTS
+        + dataforseo_calls * _cfg.COST_PER_DATAFORSEO_CALL_CENTS
+        + (ai_input_tokens // 1000) * _cfg.COST_PER_AI_1K_INPUT_TOKENS_CENTS
+        + (ai_output_tokens // 1000) * _cfg.COST_PER_AI_1K_OUTPUT_TOKENS_CENTS
+        + backlinks_calls * _cfg.COST_PER_BACKLINKS_CALL_CENTS
+        + pages_crawled * _cfg.COST_PER_PAGE_CRAWLED_CENTS
+    )
+
+    sb.table("audit_costs").insert({
+        "audit_id": audit_id,
+        "user_id": user_id,
+        "serpapi_calls": serpapi_calls,
+        "dataforseo_calls": dataforseo_calls,
+        "ai_input_tokens": ai_input_tokens,
+        "ai_output_tokens": ai_output_tokens,
+        "backlinks_calls": backlinks_calls,
+        "pages_crawled": pages_crawled,
+        "cost_cents": cost,
+    }).execute()
+
+
 def _dispatch_webhooks(agency_owner_id: str, event: str, payload: dict) -> None:
     """Enqueue webhook deliveries via the web app's pg-boss queue.
 
@@ -392,6 +436,21 @@ def run_audit_task(audit_id: str) -> None:
             )
         except Exception:  # noqa: BLE001
             logger.exception("Webhook dispatch failed for audit %s", audit_id)
+
+        # After webhook dispatch, also dispatch to connected integrations
+        # with auto-send enabled. Failure here is fully isolated — it can
+        # never affect audit completion.
+        from .integrations_worker import _dispatch_integration_sends
+        try:
+            _dispatch_integration_sends(params.get("created_by") or "", audit_id, summary)
+        except Exception:  # noqa: BLE001
+            logger.exception("Integration auto-send failed for audit %s", audit_id)
+
+        # Log per-audit API cost for the finance dashboard. Failure isolated.
+        try:
+            _log_audit_cost(sb, audit_id, params.get("created_by") or "", summary)
+        except Exception:  # noqa: BLE001
+            logger.exception("Cost logging failed for audit %s", audit_id)
 
     except InterruptedError:
         logger.info(f"Audit {audit_id} was cancelled during execution.")

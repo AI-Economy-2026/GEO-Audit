@@ -25,11 +25,18 @@ def score_technical(site_index: dict, health: dict | None) -> float:
         return _clamp(index_score)
     s = health["summary"]
     extras = (
-        (10.0 if s.get("robots_txt") else 0.0)
-        + (10.0 if s.get("sitemap_xml") else 0.0)
-        + (s.get("https_pct") or 0) * 0.1
+        (8.0 if s.get("robots_txt") else 0.0)
+        + (8.0 if s.get("sitemap_xml") else 0.0)
+        + (s.get("https_pct") or 0) * 0.08
     )
-    return _clamp(index_score * 0.7 + extras)
+    # NEW: canonical correctness (max +4)
+    extras += (s.get("canonical_pct") or 0) * 0.04
+    # NEW: indexability penalty (max -5)
+    extras -= (s.get("noindex_pct") or 0) * 0.05
+    # NEW: broken links penalty (-2 per broken link, max -10)
+    broken = s.get("broken_links_total") or 0
+    extras -= min(10.0, broken * 2.0)
+    return _clamp(index_score * 0.6 + extras)
 
 
 def score_content(rankings: dict, content_gaps: dict | None) -> float:
@@ -56,13 +63,20 @@ def score_experience(health: dict | None) -> float:
     if not health or not health.get("summary"):
         return 40.0
     s = health["summary"]
-    return _clamp(
-        (s.get("title_pct") or 0) * 0.25
-        + (s.get("meta_pct") or 0) * 0.2
-        + (s.get("h1_pct") or 0) * 0.2
-        + (s.get("viewport_pct") or 0) * 0.2
-        + (s.get("schema_pct") or 0) * 0.15
+    score = (
+        (s.get("title_pct") or 0) * 0.15
+        + (s.get("meta_pct") or 0) * 0.12
+        + (s.get("h1_pct") or 0) * 0.12
+        + (s.get("viewport_pct") or 0) * 0.15
+        + (s.get("schema_pct") or 0) * 0.10
     )
+    # NEW: quality checks
+    score += (s.get("title_optimal_pct") or 0) * 0.08
+    score += (s.get("meta_optimal_pct") or 0) * 0.08
+    # NEW: duplicate penalties
+    score -= (s.get("dup_title_pct") or 0) * 0.10
+    score -= (s.get("dup_meta_pct") or 0) * 0.10
+    return _clamp(score)
 
 
 def score_local(local: dict | None, gbp: dict | None) -> float:

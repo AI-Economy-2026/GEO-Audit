@@ -25,6 +25,7 @@ class _LinkParser(HTMLParser):
         self.title = ""
         self._in_title = False
         self.meta_description = ""
+        self.meta_robots = ""
         self.h1s: list[str] = []
         self.canonical = ""
         self.has_viewport = False
@@ -43,6 +44,8 @@ class _LinkParser(HTMLParser):
                 self.meta_description = ad.get("content", "")
             if name == "viewport":
                 self.has_viewport = True
+            if name == "robots":
+                self.meta_robots = ad.get("content", "")
         elif tag == "link" and ad.get("rel", "").lower() == "canonical":
             self.canonical = ad.get("href", "")
         elif tag == "h1":
@@ -130,6 +133,40 @@ def _fetch(url: str) -> tuple[Optional[int], str, Optional[str]]:
         return None, "", str(exc)[:200]
 
 
+def _normalize_url(url: str) -> str:
+    """Normalize a URL for comparison: lowercase scheme+host, strip fragment, strip trailing slash."""
+    try:
+        parsed = urllib.parse.urlparse(url)
+    except Exception:
+        return url.lower().split("#")[0].rstrip("/")
+    scheme = parsed.scheme.lower()
+    netloc = parsed.netloc.lower()
+    path = parsed.path.rstrip("/") or "/"
+    query = parsed.query
+    normalized = f"{scheme}://{netloc}{path}"
+    if query:
+        normalized += f"?{query}"
+    return normalized
+
+
+def _count_broken_links(page_url: str, links: list[str], origin: str, limit: int = 10) -> int:
+    """Check internal links for 404s. Limited to *limit* checks to avoid slowness."""
+    checked = 0
+    broken = 0
+    for href in links:
+        if checked >= limit:
+            break
+        abs_url = urllib.parse.urljoin(page_url, href)
+        if not abs_url.startswith(origin):
+            continue
+        abs_url = abs_url.split("#")[0]
+        status, _, _ = _fetch(abs_url)
+        checked += 1
+        if status is not None and int(status) == 404:
+            broken += 1
+    return broken
+
+
 def crawl_site_health(start_url: str, max_pages: int = MAX_PAGES) -> dict[str, Any]:
     if not start_url.startswith("http"):
         start_url = "https://" + start_url.lstrip("/")
@@ -159,17 +196,37 @@ def crawl_site_health(start_url: str, max_pages: int = MAX_PAGES) -> dict[str, A
                 parser.feed(html)
             except Exception:  # noqa: BLE001
                 pass
+        title = parser.title.strip()
+        meta_desc = parser.meta_description.strip()
+        canonical_href = parser.canonical or None
+        # Canonical self-referencing: resolved canonical points to same URL
+        canonical_self = False
+        if canonical_href:
+            canon_abs = urllib.parse.urljoin(url, canonical_href).split("#")[0]
+            canonical_self = _normalize_url(canon_abs) == _normalize_url(url)
+        # Meta robots noindex
+        robots_content = parser.meta_robots.lower()
+        meta_robots_noindex = "noindex" in robots_content
+        # Broken links (internal only, max 10 checks)
+        broken_count = _count_broken_links(url, parser.links, origin, limit=10) if html else 0
+
         page = {
             "url": url,
             "status": status,
             "error": err,
-            "title": parser.title.strip(),
-            "meta_description": bool(parser.meta_description.strip()),
+            "title": title,
+            "meta_description": bool(meta_desc),
+            "meta_description_text": meta_desc,
             "h1_count": len(parser.h1s),
-            "canonical": parser.canonical or None,
+            "canonical": canonical_href,
             "has_viewport": parser.has_viewport,
             "has_schema": parser.has_schema,
             "https": url.startswith("https://"),
+            "canonical_self_referencing": canonical_self,
+            "meta_robots_noindex": meta_robots_noindex,
+            "title_length": len(title),
+            "meta_length": len(meta_desc),
+            "broken_links": broken_count,
         }
         pages.append(page)
 
@@ -187,6 +244,23 @@ def crawl_site_health(start_url: str, max_pages: int = MAX_PAGES) -> dict[str, A
             return 0.0
         return round(100 * sum(1 for p in ok_pages if pred(p)) / len(ok_pages), 1)
 
+    # Duplicate title / meta detection (titles appearing more than once)
+    title_counts: dict[str, int] = {}
+    meta_counts: dict[str, int] = {}
+    for p in ok_pages:
+        t = (p.get("title") or "").strip().lower()
+        if t:
+            title_counts[t] = title_counts.get(t, 0) + 1
+        m = (p.get("meta_description_text") or "").strip().lower()
+        if m:
+            meta_counts[m] = meta_counts.get(m, 0) + 1
+    dup_title_pages = sum(c for t, c in title_counts.items() if c > 1)
+    dup_meta_pages = sum(c for t, c in meta_counts.items() if c > 1)
+
+    # Averages
+    avg_title_length = round(sum(p.get("title_length") or 0 for p in ok_pages) / len(ok_pages), 1) if ok_pages else 0.0
+    avg_meta_length = round(sum(p.get("meta_length") or 0 for p in ok_pages) / len(ok_pages), 1) if ok_pages else 0.0
+
     summary = {
         "pages_crawled": len(pages),
         "ok_pages": len(ok_pages),
@@ -198,6 +272,15 @@ def crawl_site_health(start_url: str, max_pages: int = MAX_PAGES) -> dict[str, A
         "schema_pct": pct(lambda p: p.get("has_schema")),
         "robots_txt": robots_ok,
         "sitemap_xml": sitemap_ok,
+        "canonical_pct": pct(lambda p: p.get("canonical_self_referencing")),
+        "noindex_pct": pct(lambda p: p.get("meta_robots_noindex")),
+        "broken_links_total": sum(p.get("broken_links") or 0 for p in pages),
+        "dup_title_pct": round(100 * dup_title_pages / len(ok_pages), 1) if ok_pages else 0.0,
+        "dup_meta_pct": round(100 * dup_meta_pages / len(ok_pages), 1) if ok_pages else 0.0,
+        "avg_title_length": avg_title_length,
+        "avg_meta_length": avg_meta_length,
+        "title_optimal_pct": pct(lambda p: 30 <= (p.get("title_length") or 0) <= 60),
+        "meta_optimal_pct": pct(lambda p: 120 <= (p.get("meta_length") or 0) <= 160),
     }
 
     return {

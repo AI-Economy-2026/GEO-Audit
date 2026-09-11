@@ -28,10 +28,12 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 import stripe
 
 from .config import WORKER_API_KEY
+from .mcp_server import router as mcp_router
 from .worker import run_audit_task, run_audit_extension
 from . import billing
 from .watches import tick_due_watches
 from .webhooks import deliver_event
+from .integrations_worker import send_to_integration
 from engine.generate_prompts import generate_wizard_prompts
 from engine.providers.serp import SerpCapability, get_serp_provider, provider_status
 from engine.providers.serp._http import clean_domain
@@ -74,6 +76,9 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
+
+# Mount the MCP tool endpoints (auth via per-agency MCP API keys, not worker auth)
+app.include_router(mcp_router)
 
 
 class AuditStartRequest(BaseModel):
@@ -484,6 +489,12 @@ class DeliverWebhookRequest(BaseModel):
     payload: dict
 
 
+class IntegrationSendRequest(BaseModel):
+    service: str
+    audit_id: str
+    user_id: str
+
+
 @app.post("/api/webhooks/deliver")
 async def webhooks_deliver(
     req: DeliverWebhookRequest,
@@ -541,4 +552,254 @@ async def gsc_search_analytics(req: Request, _: None = Depends(require_worker_au
         return query_search_analytics(user_id, site_url, start_date, end_date, row_limit)
     except Exception as e:
         raise _opaque_error(e, "GSC search analytics failed", message="Could not query GSC data.")
+
+
+@app.get("/api/ga4/properties")
+async def ga4_properties(req: Request, _: None = Depends(require_worker_auth)):
+    """List GA4 properties for a user."""
+    from app.ga4 import list_properties
+    user_id = req.query_params.get("user_id", "")
+    if not user_id:
+        raise HTTPException(status_code=400, detail="user_id is required")
+    try:
+        return list_properties(user_id)
+    except Exception as e:
+        raise _opaque_error(e, "GA4 properties list failed", message="Could not list GA4 properties.")
+
+
+# ---------------------------------------------------------------------------
+# Integrations — send + proxy lookups (Notion / Asana / Slack / GHL)
+# ---------------------------------------------------------------------------
+
+
+@app.post("/api/integrations/send")
+async def integrations_send(
+    req: IntegrationSendRequest,
+    background_tasks: BackgroundTasks,
+    _: None = Depends(require_worker_auth),
+):
+    """Enqueue an integration send as a background task.
+
+    Returns immediately with a job_id; the actual send runs in a
+    BackgroundTask and never raises into the request lifecycle.
+    """
+    job_id = str(uuid.uuid4())
+    background_tasks.add_task(
+        send_to_integration,
+        req.service,
+        req.audit_id,
+        req.user_id,
+    )
+    return {"status": "queued", "job_id": job_id}
+
+
+def _lookup_integration_credential(user_id: str, service: str) -> str:
+    """Look up a user's connected integration and decrypt its credential."""
+    from .supabase_client import get_supabase
+    from .encryption import decrypt_token
+
+    sb = get_supabase()
+    integration = (
+        sb.table("agency_integrations")
+        .select("credential_enc")
+        .eq("user_id", user_id)
+        .eq("service", service)
+        .eq("status", "connected")
+        .maybeSingle()
+        .execute()
+    ).data
+    if not integration:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No connected {service} integration for this user.",
+        )
+    return decrypt_token(integration["credential_enc"])
+
+
+@app.get("/api/ghl/contacts")
+async def ghl_contacts(
+    search: str = "",
+    page: int = 1,
+    user_id: str = "",
+    _: None = Depends(require_worker_auth),
+):
+    """Fetch contacts from GHL for the client picker."""
+    if not user_id:
+        raise HTTPException(status_code=400, detail="user_id is required")
+
+    try:
+        api_key = _lookup_integration_credential(user_id, "ghl")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise _opaque_error(e, "GHL credential lookup failed", message="Could not load GHL credentials.")
+
+    import urllib.request
+    import urllib.parse
+    import json as _json
+
+    limit = 20
+    skip = (page - 1) * limit
+    qs = urllib.parse.urlencode({
+        "query": search,
+        "limit": limit,
+        "skip": skip,
+    })
+    req = urllib.request.Request(
+        f"https://rest.gohighlevel.com/v1/contacts?{qs}",
+        headers={"Authorization": f"Bearer {api_key}"},
+        method="GET",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            data = _json.loads(resp.read().decode("utf-8"))
+    except Exception as e:
+        raise _opaque_error(e, "GHL contacts fetch failed", message="Could not fetch GHL contacts.")
+
+    contacts = []
+    for c in data.get("contacts") or []:
+        first = c.get("firstName", "") or ""
+        last = c.get("lastName", "") or ""
+        name = f"{first} {last}".strip() or c.get("name", "")
+        contacts.append({
+            "id": c.get("id"),
+            "name": name,
+            "email": c.get("email"),
+            "phone": c.get("phone"),
+            "company_name": c.get("companyName") or c.get("company_name"),
+            "website": c.get("website"),
+        })
+
+    total = data.get("count") or len(contacts)
+    has_more = skip + len(contacts) < total
+    return {"contacts": contacts, "total": total, "has_more": has_more}
+
+
+@app.get("/api/notion/databases")
+async def notion_databases(
+    user_id: str = "",
+    _: None = Depends(require_worker_auth),
+):
+    """List Notion databases for the database selector."""
+    if not user_id:
+        raise HTTPException(status_code=400, detail="user_id is required")
+
+    try:
+        token = _lookup_integration_credential(user_id, "notion")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise _opaque_error(e, "Notion credential lookup failed", message="Could not load Notion credentials.")
+
+    import urllib.request
+    import json as _json
+
+    req = urllib.request.Request(
+        "https://api.notion.com/v1/databases",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Notion-Version": "2022-06-28",
+        },
+        method="GET",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            data = _json.loads(resp.read().decode("utf-8"))
+    except Exception as e:
+        raise _opaque_error(e, "Notion databases fetch failed", message="Could not fetch Notion databases.")
+
+    databases = []
+    for db in data.get("results", []):
+        # Notion titles are rich-text arrays
+        title_parts = db.get("title", [])
+        title = ""
+        if isinstance(title_parts, list):
+            title = "".join(
+                t.get("plain_text", "") for t in title_parts if isinstance(t, dict)
+            )
+        databases.append({
+            "id": db.get("id"),
+            "title": title or "Untitled",
+            "url": db.get("url"),
+        })
+    return {"databases": databases}
+
+
+@app.get("/api/asana/workspaces")
+async def asana_workspaces(
+    user_id: str = "",
+    _: None = Depends(require_worker_auth),
+):
+    """List Asana workspaces."""
+    if not user_id:
+        raise HTTPException(status_code=400, detail="user_id is required")
+
+    try:
+        token = _lookup_integration_credential(user_id, "asana")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise _opaque_error(e, "Asana credential lookup failed", message="Could not load Asana credentials.")
+
+    import urllib.request
+    import json as _json
+
+    req = urllib.request.Request(
+        "https://app.asana.com/api/1.0/workspaces",
+        headers={"Authorization": f"Bearer {token}"},
+        method="GET",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            data = _json.loads(resp.read().decode("utf-8"))
+    except Exception as e:
+        raise _opaque_error(e, "Asana workspaces fetch failed", message="Could not fetch Asana workspaces.")
+
+    workspaces = [
+        {"id": w.get("gid"), "name": w.get("name", "")}
+        for w in data.get("data", [])
+    ]
+    return {"workspaces": workspaces}
+
+
+@app.get("/api/asana/projects")
+async def asana_projects(
+    user_id: str = "",
+    workspace_id: str = "",
+    _: None = Depends(require_worker_auth),
+):
+    """List Asana projects in a workspace."""
+    if not user_id:
+        raise HTTPException(status_code=400, detail="user_id is required")
+    if not workspace_id:
+        raise HTTPException(status_code=400, detail="workspace_id is required")
+
+    try:
+        token = _lookup_integration_credential(user_id, "asana")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise _opaque_error(e, "Asana credential lookup failed", message="Could not load Asana credentials.")
+
+    import urllib.request
+    import urllib.parse
+    import json as _json
+
+    qs = urllib.parse.urlencode({"workspace": workspace_id, "limit": 50})
+    req = urllib.request.Request(
+        f"https://app.asana.com/api/1.0/projects?{qs}",
+        headers={"Authorization": f"Bearer {token}"},
+        method="GET",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            data = _json.loads(resp.read().decode("utf-8"))
+    except Exception as e:
+        raise _opaque_error(e, "Asana projects fetch failed", message="Could not fetch Asana projects.")
+
+    projects = [
+        {"id": p.get("gid"), "name": p.get("name", "")}
+        for p in data.get("data", [])
+    ]
+    return {"projects": projects}
 

@@ -6,4 +6,6 @@ anthropic>=0.30.0
 python-dotenv>=1.0.0
 stripe>=15.0.0
 pytest>=8.0.0
+cryptography>=43.0.0
+mcp>=1.0.0
 # v2 - force redeploy
