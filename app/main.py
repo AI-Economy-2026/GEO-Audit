@@ -500,3 +500,45 @@ async def webhooks_deliver(
 async def providers_status(_: None = Depends(require_worker_auth)):
     return provider_status()
 
+
+@app.get("/api/engines/available")
+async def engines_available(_: None = Depends(require_worker_auth)):
+    """Return the list of engines that have their required API keys configured."""
+    from engine.geo_audit_engine import ENGINE_KEY_MAP
+    available = []
+    for engine_name, env_key in ENGINE_KEY_MAP.items():
+        if os.environ.get(env_key, "").strip():
+            available.append(engine_name)
+    return {"engines": available, "providers": provider_status()}
+
+
+@app.get("/api/gsc/sites")
+async def gsc_sites(req: Request, _: None = Depends(require_worker_auth)):
+    """List GSC properties for a user."""
+    from app.gsc import list_sites
+    user_id = req.query_params.get("user_id", "")
+    if not user_id:
+        raise HTTPException(status_code=400, detail="user_id is required")
+    try:
+        return list_sites(user_id)
+    except Exception as e:
+        raise _opaque_error(e, "GSC sites list failed", message="Could not list GSC properties.")
+
+
+@app.post("/api/gsc/search-analytics")
+async def gsc_search_analytics(req: Request, _: None = Depends(require_worker_auth)):
+    """Query GSC Search Analytics for a user's property."""
+    from app.gsc import query_search_analytics
+    body = await req.json()
+    user_id = body.get("user_id", "")
+    site_url = body.get("site_url", "")
+    start_date = body.get("start_date")
+    end_date = body.get("end_date")
+    row_limit = body.get("row_limit", 100)
+    if not user_id or not site_url:
+        raise HTTPException(status_code=400, detail="user_id and site_url are required")
+    try:
+        return query_search_analytics(user_id, site_url, start_date, end_date, row_limit)
+    except Exception as e:
+        raise _opaque_error(e, "GSC search analytics failed", message="Could not query GSC data.")
+

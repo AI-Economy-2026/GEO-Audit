@@ -16,6 +16,9 @@ SUPABASE_SERVICE_ROLE_KEY: str = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
 # --- Worker auth ---
 WORKER_API_KEY: str = os.environ.get("WORKER_API_KEY", "")
 
+# --- Web app URL (for webhook dispatch via pg-boss) ---
+WEB_APP_URL: str = os.environ.get("WEB_APP_URL", "")
+
 # --- Stripe ---
 STRIPE_SECRET_KEY: str = os.environ.get("STRIPE_SECRET_KEY", "")
 STRIPE_WEBHOOK_SECRET: str = os.environ.get("STRIPE_WEBHOOK_SECRET", "")

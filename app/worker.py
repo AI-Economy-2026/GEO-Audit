@@ -10,9 +10,12 @@ directory checks, SERP analysis, Alice brief).
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
+import os
 import sys
 import time
+import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -43,6 +46,53 @@ logger = logging.getLogger(__name__)
 
 # Path to the bundled template
 TEMPLATE_PATH = str(Path(__file__).resolve().parent.parent / "engine" / "geo-dashboard-template.html")
+
+
+def _dispatch_webhooks(agency_owner_id: str, event: str, payload: dict) -> None:
+    """Enqueue webhook deliveries via the web app's pg-boss queue.
+
+    Calls POST /api/webhooks/dispatch on the Next.js app, which enqueues
+    one background job per matching webhook endpoint. Falls back to
+    synchronous delivery (app1/app/webhooks.py) if the web app is
+    unreachable or WEB_APP_URL is not configured.
+    """
+    web_app_url = os.environ.get("WEB_APP_URL", "").rstrip("/")
+    worker_key = os.environ.get("WORKER_API_KEY", "")
+
+    if web_app_url:
+        try:
+            body = json.dumps({
+                "agencyOwnerId": agency_owner_id,
+                "event": event,
+                "payload": payload,
+            }).encode("utf-8")
+            req = urllib.request.Request(
+                f"{web_app_url}/api/webhooks/dispatch",
+                data=body,
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {worker_key}",
+                },
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                result = json.loads(resp.read().decode("utf-8"))
+                logger.info(
+                    "Webhook dispatch: %d enqueued, %d failed",
+                    result.get("enqueued", 0),
+                    result.get("failed", 0),
+                )
+                return
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "Webhook dispatch via web app failed (%s), "
+                "falling back to synchronous delivery",
+                str(exc)[:200],
+            )
+
+    # Fallback: synchronous delivery (old path)
+    from .webhooks import deliver_event
+    deliver_event(agency_owner_id, event, payload)
 
 
 def run_audit_task(audit_id: str) -> None:
@@ -326,10 +376,11 @@ def run_audit_task(audit_id: str) -> None:
             f"Visibility: {summary['overall_visibility']['visibility_rate_percent']}%"
         )
 
-        # Outbound webhooks (best-effort)
+        # Outbound webhooks — enqueue via the web app's pg-boss queue
+        # (scalable background workers with retries + backoff).
+        # Falls back to synchronous delivery if the web app is unreachable.
         try:
-            from .webhooks import deliver_event
-            deliver_event(
+            _dispatch_webhooks(
                 params.get("created_by") or "",
                 "audit.completed",
                 {
@@ -340,7 +391,7 @@ def run_audit_task(audit_id: str) -> None:
                 },
             )
         except Exception:  # noqa: BLE001
-            logger.exception("Webhook delivery failed for audit %s", audit_id)
+            logger.exception("Webhook dispatch failed for audit %s", audit_id)
 
     except InterruptedError:
         logger.info(f"Audit {audit_id} was cancelled during execution.")

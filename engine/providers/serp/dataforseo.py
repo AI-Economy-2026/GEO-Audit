@@ -170,6 +170,45 @@ class DataForSeoProvider:
             logger.warning("DataForSEO backlinks failed: %s",exc)
             return {"provider": self.name, "error": str(exc)[:200]}
 
+    def backlinks_list(
+        self,
+        domain: str,
+        country: Optional[str] = None,
+        limit: int = 50,
+    ) -> dict[str, Any]:
+        if not self.is_configured():
+            return self._unavailable("backlinks_list")
+        domain = clean_domain(domain)
+        try:
+            raw = self._post(
+                "/backlinks/backend/live",
+                [{
+                    "target": domain,
+                    "include_subdomains": True,
+                    "limit": min(limit, 100),
+                    "order_by": ["domain_from_rank,desc"],
+                }],
+            )
+            tasks = (raw or {}).get("tasks") or []
+            result = ((tasks[0] or {}).get("result") or [{}])[0] if tasks else {}
+            items = result.get("items") or []
+            links = []
+            for item in items:
+                links.append({
+                    "source_url": item.get("url_from") or "",
+                    "source_domain": item.get("domain_from") or "",
+                    "target_url": item.get("url_to") or "",
+                    "anchor": item.get("anchor") or "",
+                    "domain_rank": item.get("domain_from_rank"),
+                    "page_rank": item.get("page_from_rank"),
+                    "first_seen": item.get("first_seen"),
+                    "is_lost": item.get("is_lost"),
+                })
+            return {"provider": self.name, "backlinks": links, "error": None}
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("DataForSEO backlinks_list failed: %s", exc)
+            return {"provider": self.name, "backlinks": [], "error": str(exc)[:200]}
+
     def local_pack(
         self,
         query: str,
