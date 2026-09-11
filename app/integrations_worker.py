@@ -48,7 +48,7 @@ def send_to_integration(service: str, audit_id: str, user_id: str) -> dict:
             .eq("user_id", user_id)
             .eq("service", service)
             .eq("status", "connected")
-            .maybeSingle()
+            .maybe_single()
             .execute()
         ).data
     except Exception as exc:  # noqa: BLE001
@@ -72,7 +72,7 @@ def send_to_integration(service: str, audit_id: str, user_id: str) -> dict:
             sb.table("geo_audits")
             .select("*, summary_json")
             .eq("id", audit_id)
-            .maybeSingle()
+            .maybe_single()
             .execute()
         ).data
     except Exception as exc:  # noqa: BLE001

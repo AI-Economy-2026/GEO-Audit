@@ -605,7 +605,7 @@ def _lookup_integration_credential(user_id: str, service: str) -> str:
         .eq("user_id", user_id)
         .eq("service", service)
         .eq("status", "connected")
-        .maybeSingle()
+        .maybe_single()
         .execute()
     ).data
     if not integration:
@@ -697,13 +697,11 @@ async def notion_databases(
     # Use the search API so we find both databases AND pages the
     # integration has been shared with. The /v1/databases endpoint only
     # returns top-level databases, which misses most user content.
+    # The Notion search endpoint does NOT support compound (or/and)
+    # filters — only a single filter. So we query without a filter
+    # and get all shared content, then separate databases from pages
+    # client-side.
     search_body = _json.dumps({
-        "filter": {
-            "or": [
-                {"property": "object", "value": "database"},
-                {"property": "object", "value": "page"},
-            ]
-        },
         "page_size": 50,
     }).encode("utf-8")
 

@@ -59,7 +59,7 @@ def _get_valid_access_token(user_id: str) -> str:
     sb = _get_supabase()
     result = sb.table("ga4_connections").select(
         "refresh_token_enc, access_token_enc, token_expires_at"
-    ).eq("user_id", user_id).maybeSingle().execute()
+    ).eq("user_id", user_id).maybe_single().execute()
 
     if not result.data:
         raise RuntimeError("No GA4 connection found for user")

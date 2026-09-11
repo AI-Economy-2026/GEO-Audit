@@ -195,7 +195,7 @@ def _tool_get_audit_summary(user_id: str, audit_id: str) -> dict[str, Any]:
         )
         .eq("id", audit_id)
         .eq("created_by", user_id)
-        .maybeSingle()
+        .maybe_single()
         .execute()
     )
     if not result.data:
@@ -210,7 +210,7 @@ def _tool_get_site_health(user_id: str, audit_id: str) -> dict[str, Any]:
         .select("summary_json, brand_name")
         .eq("id", audit_id)
         .eq("created_by", user_id)
-        .maybeSingle()
+        .maybe_single()
         .execute()
     )
     if not result.data:
@@ -232,7 +232,7 @@ def _tool_get_opportunities(user_id: str, audit_id: str) -> dict[str, Any]:
         .select("summary_json, brand_name")
         .eq("id", audit_id)
         .eq("created_by", user_id)
-        .maybeSingle()
+        .maybe_single()
         .execute()
     )
     if not result.data:
@@ -253,7 +253,7 @@ def _tool_get_rankings(user_id: str, audit_id: str) -> dict[str, Any]:
         .select("summary_json, brand_name, visibility_rate, engines")
         .eq("id", audit_id)
         .eq("created_by", user_id)
-        .maybeSingle()
+        .maybe_single()
         .execute()
     )
     if not result.data:
