@@ -152,11 +152,17 @@ def send_to_integration(service: str, audit_id: str, user_id: str) -> dict:
 
 
 def _send_to_notion(token: str, config: dict, audit: dict) -> dict:
-    """Create a page in the configured Notion database."""
-    database_id = config.get("database_id")
-    if not database_id:
-        return {"success": False, "error": "No Notion database selected"}
+    """Create a page in the configured Notion database or under a page.
 
+    The user can select either a database or a page from the dropdown.
+    If it's a database, the new page is created inside it.  If it's a
+    page, the new page is created as a child of it.
+    """
+    target_id = config.get("database_id")
+    if not target_id:
+        return {"success": False, "error": "No Notion target selected"}
+
+    target_type = config.get("target_type", "database")
     summary = audit.get("summary_json") or {}
     visibility = (
         summary.get("overall_visibility", {}).get("visibility_rate_percent", 0)
@@ -222,18 +228,19 @@ def _send_to_notion(token: str, config: dict, audit: dict) -> dict:
             },
         })
 
+    # Parent changes depending on whether the target is a database or a page.
+    if target_type == "page":
+        parent = {"page_id": target_id}
+    else:
+        parent = {"database_id": target_id}
+
     payload: dict[str, Any] = {
-        "parent": {"database_id": database_id},
+        "parent": parent,
         "properties": {
             "title": [{"text": {"content": title}}],
         },
         "children": children,
     }
-
-    # Notion accepts a "Visibility" / "SEO Score" number property only if the
-    # database has those columns; include them defensively.
-    payload["properties"]["Visibility"] = {"number": visibility}
-    payload["properties"]["SEO Score"] = {"number": seo_score}
 
     req = urllib.request.Request(
         "https://api.notion.com/v1/pages",

@@ -694,33 +694,62 @@ async def notion_databases(
     import urllib.request
     import json as _json
 
+    # Use the search API so we find both databases AND pages the
+    # integration has been shared with. The /v1/databases endpoint only
+    # returns top-level databases, which misses most user content.
+    search_body = _json.dumps({
+        "filter": {
+            "or": [
+                {"property": "object", "value": "database"},
+                {"property": "object", "value": "page"},
+            ]
+        },
+        "page_size": 50,
+    }).encode("utf-8")
+
     req = urllib.request.Request(
-        "https://api.notion.com/v1/databases",
+        "https://api.notion.com/v1/search",
+        data=search_body,
         headers={
             "Authorization": f"Bearer {token}",
             "Notion-Version": "2022-06-28",
+            "Content-Type": "application/json",
         },
-        method="GET",
+        method="POST",
     )
     try:
         with urllib.request.urlopen(req, timeout=30) as resp:
             data = _json.loads(resp.read().decode("utf-8"))
     except Exception as e:
-        raise _opaque_error(e, "Notion databases fetch failed", message="Could not fetch Notion databases.")
+        raise _opaque_error(e, "Notion search failed", message="Could not fetch Notion content.")
 
     databases = []
     for db in data.get("results", []):
-        # Notion titles are rich-text arrays
-        title_parts = db.get("title", [])
+        obj_type = db.get("object", "")
+        # Databases have a "title" array; pages have a "properties"
+        # dict whose "title" property holds the rich-text array.
         title = ""
-        if isinstance(title_parts, list):
-            title = "".join(
-                t.get("plain_text", "") for t in title_parts if isinstance(t, dict)
-            )
+        if obj_type == "database":
+            title_parts = db.get("title", [])
+            if isinstance(title_parts, list):
+                title = "".join(
+                    t.get("plain_text", "") for t in title_parts if isinstance(t, dict)
+                )
+        else:  # page
+            props = db.get("properties", {})
+            for prop in props.values():
+                if isinstance(prop, dict) and prop.get("type") == "title":
+                    parts = prop.get("title", [])
+                    if isinstance(parts, list):
+                        title = "".join(
+                            t.get("plain_text", "") for t in parts if isinstance(t, dict)
+                        )
+                    break
         databases.append({
             "id": db.get("id"),
             "title": title or "Untitled",
             "url": db.get("url"),
+            "type": obj_type,
         })
     return {"databases": databases}
 
